@@ -6,6 +6,9 @@ dist/
 # Idea fles
 .idea
 
+# gradle file
+.gradle
+
 # Compiled class file
 *.class
 
