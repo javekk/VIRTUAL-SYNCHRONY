@@ -6,6 +6,7 @@ dist/
 # Idea fles
 .idea
 local.properties
+.iml
 
 # gradle file
 
