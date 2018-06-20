@@ -40,18 +40,27 @@ crashes of some existing participants at any time.
 ## Network
 * Each node is a separate process comunicating through the network
 
-## Log file
-* Each operation write in log :
-															- <ID> install view <view seqnum> <participant list> — with comma*separated IDs
-															– <ID> send multicast <seqnum> within <view seqnum>
-															– <ID> deliver multicast <seqnum> from <ID> within <view seqnum>  
-
-## Emulate crash
+## Emulate crash
 * If using network -> shut down process
 
-## Join/crash position
+## Join/crash position
 * During sending multicast
 * After receiving multicast
 * After receiving view change
+
+## Log file
+* Each operation write in log :
+
+```															
+	- <ID> install view <view seqnum> <participant list> — with comma*separated IDs
+```												
+```
+	– <ID> send multicast <seqnum> within <view seqnum>
+```
+```
+	– <ID> deliver multicast <seqnum> from <ID> within <view seqnum>  
+```
+
+
 
 
