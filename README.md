@@ -1,6 +1,6 @@
 # VIRTUAL-SYNCHRONY
 
-In this project, you are requested to implement a simple peer-to-peer group communication service providing
+In this project, it is implemented a simple peer-to-peer group communication service providing
 the virtual synchrony guarantees.
 
 The project is implemented in Akka with the group members being Akka actors that send multicast
