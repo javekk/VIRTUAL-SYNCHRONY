@@ -44,7 +44,7 @@ crashes of some existing participants at any time.
 * Each operation write in log :
 															- <ID> install view <view seqnum> <participant list> — with comma*separated IDs
 															– <ID> send multicast <seqnum> within <view seqnum>
-															– <ID> deliver multicast <seqnum> from <ID> within <view seqnum>  
+													– <ID> deliver multicast <seqnum> from <ID> within <view seqnum>  
 
 ## Emulate crash
 * If using network -> shut down process

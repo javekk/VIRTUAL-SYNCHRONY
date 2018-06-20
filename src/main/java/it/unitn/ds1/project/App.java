@@ -23,6 +23,8 @@ import java.util.Iterator;
 
 import java.io.IOException;
 
+
+
 public class App{
 
     final static int N_INITIAL_PARTICIPANTS = 3;
@@ -55,13 +57,25 @@ public class App{
         public final Decision decision;
         public DecisionResponse(Decision d) { decision = d; }
     }
+
+
     public static class Timeout implements Serializable {}
 
     // a message that emulates a node restart
     public static class Recovery implements Serializable {}
 
-    /*-- Common functionality for both Coordinator and Particimants ------------*/
+
+
+    /*
+      _   _    ___    ____    _____
+     | \ | |  / _ \  |  _ \  | ____|
+     |  \| | | | | | | | | | |  _|
+     | |\  | | |_| | | |_| | | |___
+     |_| \_|  \___/  |____/  |_____|
+     */
+    /*--------- Common functionality for both Coordinator and Particimants ------------*/
     public abstract static class Node extends AbstractActor {
+
         protected int id;                           // node ID
         protected List<ActorRef> participants;      // list of participant nodes
         protected Decision decision = null;         // decision taken by this node
@@ -92,14 +106,17 @@ public class App{
                     getContext().system().dispatcher(), getSelf()
             );
         }
+
         // emulate a delay of d milliseconds
         void delay(int d) {
             try {Thread.sleep(d);} catch (Exception e) {}
         }
+
         void multicast(Serializable m) {
             for (ActorRef p: participants)
                 p.tell(m, getSelf());
         }
+
         // a multicast implementation that crashes after sending the first message
         void multicastAndCrash(Serializable m, int recoverIn) {
             for (ActorRef p: participants) {
@@ -107,6 +124,7 @@ public class App{
                 crash(recoverIn); return;
             }
         }
+
         // schedule a Timeout message in specified time
         void setTimeout(int time) {
             getContext().system().scheduler().scheduleOnce(
@@ -116,6 +134,7 @@ public class App{
                     getContext().system().dispatcher(), getSelf()
             );
         }
+
         // fix the final decision of the current node
         void fixDecision(Decision d) {
             if (!hasDecided()) {
@@ -123,7 +142,9 @@ public class App{
                 print("decided " + d);
             }
         }
+
         boolean hasDecided() { return decision != null; } // has the node decided?
+
         // a simple logging function
         void print(String s) {
             System.out.format("%2d: %s\n", id, s);
@@ -144,7 +165,14 @@ public class App{
         }
     }
 
-    /*-- Coordinator -----------------------------------------------------------*/
+
+    /*
+       ____                              _   _                   _
+      / ___|   ___     ___    _ __    __| | (_)  _ __     __ _  | |_    ___    _ __
+     | |      / _ \   / _ \  | '__|  / _` | | | | '_ \   / _` | | __|  / _ \  | '__|
+     | |___  | (_) | | (_) | | |    | (_| | | | | | | | | (_| | | |_  | (_) | | |
+      \____|  \___/   \___/  |_|     \__,_| |_| |_| |_|  \__,_|  \__|  \___/  |_|
+     */
     public static class Coordinator extends Node {
 
         // here all the nodes that sent YES are collected
@@ -215,7 +243,7 @@ public class App{
                 print("Timeout");
                 fixDecision(Decision.ABORT);
                 multicast(new DecisionResponse(decision));
-                // TODO 1: coordinator timeout action
+
             }
         }
 
@@ -227,12 +255,19 @@ public class App{
                 fixDecision(Decision.ABORT);
                 multicast(new DecisionResponse(decision));
             }
-
-            // TODO 2: coordinator recovery action
         }
     }
 
-    /*-- Participant -----------------------------------------------------------*/
+
+    /*
+      ____                   _                   _                           _
+     |  _ \    __ _   _ __  | |_    ___    ___  (_)  _ __     __ _   _ __   | |_
+     | |_) |  / _` | | '__| | __|  / _ \  / __| | | | '_ \   / _` | | '_ \  | __|
+     |  __/  | (_| | | |    | |_  |  __/ | (__  | | | |_) | | (_| | | | | | | |_
+     |_|      \__,_| |_|     \__|  \___|  \___| |_| | .__/   \__,_| |_| |_|  \__|
+                                                    |_|
+     */
+
     public static class Participant extends Node {
         ActorRef coordinator;
         public Participant(int id) { super(id); }
@@ -307,7 +342,17 @@ public class App{
         }
     }
 
-    /*-- Main ------------------------------------------------------------------*/
+
+    
+     /*
+                :::   :::           :::        :::::::::::       ::::    :::
+              :+:+: :+:+:        :+: :+:          :+:           :+:+:   :+:
+            +:+ +:+:+ +:+      +:+   +:+         +:+           :+:+:+  +:+
+           +#+  +:+  +#+     +#++:++#++:        +#+           +#+ +:+ +#+
+          +#+       +#+     +#+     +#+        +#+           +#+  +#+#+#
+         #+#       #+#     #+#     #+#        #+#           #+#   #+#+#
+        ###       ###     ###     ###    ###########       ###    ####
+    */
     public static void main(String[] args) {
         // Create the actor system
         final ActorSystem system = ActorSystem.create("helloakka");
