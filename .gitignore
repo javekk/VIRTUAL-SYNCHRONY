@@ -1,6 +1,10 @@
+# Compiled directory
 build/
 bin/
 dist/
+
+# Idea fles
+.idea
 
 # Compiled class file
 *.class
