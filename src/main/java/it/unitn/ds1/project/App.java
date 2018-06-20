@@ -1,4 +1,4 @@
-package it.unitn.ds1;
+package it.unitn.ds1.project;
 
 import akka.actor.ActorRef;
 import akka.actor.AbstractActor;
@@ -151,7 +151,7 @@ public class App{
         private Set<ActorRef> yesVoters = new HashSet<>();
 
         boolean allVotedYes() { // returns true if all voted YES
-            return yesVoters.size() >= N_PARTICIPANTS;
+            return yesVoters.size() >= N_INITIAL_PARTICIPANTS;
         }
 
         public Coordinator() {
@@ -213,12 +213,21 @@ public class App{
             if (crashed) return;
             if (!hasDecided()) {
                 print("Timeout");
+                fixDecision(Decision.ABORT);
+                multicast(new DecisionResponse(decision));
                 // TODO 1: coordinator timeout action
             }
         }
 
         public void onRecovery(Recovery msg) {
             crashed = false;
+            if (decision == Decision.ABORT || decision == Decision.COMMIT){
+                multicast(new DecisionResponse(decision));
+            } else{
+                fixDecision(Decision.ABORT);
+                multicast(new DecisionResponse(decision));
+            }
+
             // TODO 2: coordinator recovery action
         }
     }
@@ -268,6 +277,15 @@ public class App{
             if (crashed) return;
             if (!hasDecided()) {
                 print("Timeout. Asking around.");
+                if (predefinedVotes[this.id] == Vote.YES) {
+
+                    coordinator.tell(new DecisionRequest(), getSelf());
+                    multicast(new DecisionRequest());
+                    setTimeout(DECISION_TIMEOUT);
+
+                } else {
+                    fixDecision(Decision.ABORT);
+                }
                 // TODO 3: termination protocol
                 // ask other participants and the coordinator
             }
@@ -298,7 +316,7 @@ public class App{
         ActorRef coordinator = system.actorOf(Coordinator.props(), "coordinator");
         // Create participants
         List<ActorRef> group = new ArrayList<>();
-        for (int i=0; i<N_PARTICIPANTS; i++) {
+        for (int i=0; i<N_INITIAL_PARTICIPANTS; i++) {
             group.add(system.actorOf(Participant.props(i), "participant" + i));
         }
 
