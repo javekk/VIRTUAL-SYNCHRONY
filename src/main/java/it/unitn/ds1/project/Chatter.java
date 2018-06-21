@@ -3,93 +3,249 @@ package it.unitn.ds1.project;
 
 import akka.actor.ActorRef;
 import akka.actor.AbstractActor;
-import java.util.Random;
+
+import java.util.*;
 import java.io.Serializable;
 import akka.actor.Props;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Iterator;
+import scala.Int;
+
 import java.lang.Thread;
 import java.lang.InterruptedException;
-import java.util.Collections;
+
+
+
+/*
+  *  @Author Raffaele Perini
+  * @Author Giovanni Rafael Vuolo
+  *
+  */
 
 class Chatter extends AbstractActor {
 
-    // number of chat messages to send
-    final static int N_MESSAGES = 5;
+
+
+     //         ____                                        _
+     //        / ___|   ___   _ __     ___   _ __    __ _  | |
+     //       | |  _   / _ \ | '_ \   / _ \ | '__|  / _` | | |
+     //       | |_| | |  __/ | | | | |  __/ | |    | (_| | | |
+     //        \____|  \___| |_| |_|  \___| |_|     \__,_| |_|
+
+
+    /*
+     * Limit of the messages for the node
+     */
+    private final static int N_MESSAGES = 3;
+
+    /*
+     * The list of peers (the multicast group)
+     */
+    private List<ActorRef> group;
+
+    /*
+     * Random Number used to random multicast
+     */
     private Random rnd = new Random();
-    private List<ActorRef> group; // the list of peers (the multicast group)
-    private int sendCount = 0;    // number of sent messages
-    private String myTopic;  // The topic I am interested in, null if no topic
-    private final int id;    // ID of the current actor
-    private int[] vc;        // the local vector clock
 
-    // a buffer storing all received chat messages
+
+
+    //         _   _               _            ____
+    //        | \ | |   ___     __| |   ___    |  _ \   _ __    ___    _ __    ___
+    //        |  \| |  / _ \   / _` |  / _ \   | |_) | | '__|  / _ \  | '_ \  / __|
+    //        | |\  | | (_) | | (_| | |  __/   |  __/  | |    | (_) | | |_) | \__ \
+    //        |_| \_|  \___/   \__,_|  \___|   |_|     |_|     \___/  | .__/  |___/
+    //                                                                |_|
+
+    /*
+     *   number of sent messages
+     */
+    private int sendCount = 0;
+
+    /*
+     *    ID of the current actor
+     */
+    private final int id;
+
+    /*
+     *   The local hashMap, in which we keep the last with the ActorRef and its own LastMessage
+     *   (used as Buffer)
+     */
+    private HashMap<ActorRef,ChatMsg> lastMessages = new HashMap<>();
+
+
+    /*
+     * The chat history
+     */
     private StringBuffer chatHistory = new StringBuffer();
-    // message queue to hold out-of-order messages
-    private List<ChatMsg> mq = new ArrayList<>();
 
 
-    /* -- Actor constructor --------------------------------------------------- */
-    public Chatter(int id, String topic) {
+    /*
+     * Actor Constructor
+     */
+    private Chatter(int id) {
         this.id = id;
-        this.myTopic = topic;
     }
 
-    static public Props props(int id, String topic) {
-        return Props.create(Chatter.class, () -> new Chatter(id, topic));
+    static Props props(int id) {
+        return Props.create(Chatter.class, () -> new Chatter(id));
+    }
+
+
+    //         __  __                   _____                                             ____   _
+    //        |  \/  |  ___    __ _    |_   _|  _   _   _ __     ___   ___               / ___| | |   __ _   ___   ___    ___   ___
+    //        | |\/| | / __|  / _` |     | |   | | | | | '_ \   / _ \ / __|    _____    | |     | |  / _` | / __| / __|  / _ \ / __|
+    //        | |  | | \__ \ | (_| |     | |   | |_| | | |_) | |  __/ \__ \   |_____|   | |___  | | | (_| | \__ \ \__ \ |  __/ \__ \
+    //        |_|  |_| |___/  \__, |     |_|    \__, | | .__/   \___| |___/              \____| |_|  \__,_| |___/ |___/  \___| |___/
+    //                        |___/             |___/  |_|
+
+
+    /*
+     * Here we define the mapping between the received message types
+     * and our actor methods
+     *
+     */
+    @Override
+    public Receive createReceive() {
+        return receiveBuilder()
+                .match(JoinGroupMsg.class,    this::onJoinGroupMsg)    //#1
+                .match(StartChatMsg.class,    this::onStartChatMsg)    //#2
+                .match(ChatMsg.class,         this::onChatMsg)         //#3
+                .match(PrintHistoryMsg.class, this::printHistory)      //#4
+                .build();
     }
 
 
 
-    /* -- Message types ------------------------------------------------------- */
-
-    // Start message that informs every chat participant about its peers
+    /*
+     * #1
+     * Start message that informs every chat participant about its peers
+     */
     public static class JoinGroupMsg implements Serializable {
         private final List<ActorRef> group; // list of group members
         public JoinGroupMsg(List<ActorRef> group) {
             this.group = Collections.unmodifiableList(group);
         }
+
     }
 
-    // A message requesting the peer to start a discussion on his topic
+    /*
+     * #2
+     * A message requesting the peer to start to discus
+     */
     public static class StartChatMsg implements Serializable {}
 
-    // Chat message
-    public static class ChatMsg implements Serializable {
-        public final String topic;   // "topic" of the conversation
-        public final int n;          // the number of the reply in the current topic
-        public final int senderId;   // the ID of the message sender
-        public final int[] vc;       // vector clock
 
-        public ChatMsg(String topic, int n, int senderId, int[] vc) {
-            this.topic = topic;
-            this.n = n;
+    /*
+     * #3
+     * Chat message, a normal message
+     */
+    public static class ChatMsg implements Serializable {
+
+        public final int senderId;   // the ID of the message sender
+        public String text;         // text of the messagges
+
+        public ChatMsg(int senderId, String text) {
             this.senderId = senderId;
-            this.vc = new int[vc.length];
-            for (int i=0; i<vc.length; i++)
-                this.vc[i] = vc[i];
+            this.text = text;
         }
     }
 
-    // A message requesting to print the chat history
+    /*
+     * #4
+     * A message requesting to print the chat history
+     */
     public static class PrintHistoryMsg implements Serializable {}
 
 
 
-    /* -- Actor behaviour ----------------------------------------------------- */
-    private void sendChatMsg(String topic, int n) {
-        this.vc[id] ++;
+
+     //             _             _                                ____           _
+     //            / \      ___  | |_    ___    _ __              | __ )    ___  | |__     __ _  __   __
+     //           / _ \    / __| | __|  / _ \  | '__|    _____    |  _ \   / _ \ | '_ \   / _` | \ \ / /
+     //          / ___ \  | (__  | |_  | (_) | | |      |_____|   | |_) | |  __/ | | | | | (_| |  \ V /
+     //         /_/   \_\  \___|  \__|  \___/  |_|                |____/   \___| |_| |_|  \__,_|   \_/
+
+
+    /*
+     * #1
+     * When a node enters in the group, it first of all get all the peers(init the group variable)
+     * Then print the the fact that it joined
+     */
+    private void onJoinGroupMsg(JoinGroupMsg msg) {
+
+        this.group = msg.group;
+
+        System.out.printf("%s: joining a group of %d peers with ID %02d\n",
+                getSelf().path().name(), this.group.size(), this.id);
+    }
+
+
+    /*
+     * #2
+     * The first Time I want to send a message a pass through this method then,
+     * look at sendChatMsg Method
+     */
+    private void onStartChatMsg(StartChatMsg msg) {
+        sendChatMsg(); // start with message 0
+    }
+
+
+    /*
+     * #3
+     * When we received a Message
+     * I get the last Message from the sender(to drop)
+     * I replace the last message with the new one
+     * I deliver/drop the Old Message
+     */
+    private void onChatMsg(ChatMsg msg) {
+
+        ChatMsg drop;
+        if(lastMessages.get(group.get(msg.senderId)) != null){
+            drop = lastMessages.get(group.get(msg.senderId));
+            System.out.println("\u001B[32m" + "Message \"" + drop.text + "\" " + "from Node: " + msg.senderId + " dropped by Node: " + this.id);
+
+        }
+        lastMessages.put(group.get(msg.senderId), msg);
+        deliver(msg);
+    }
+
+
+    /*
+     * #4
+     * Print the History of this node
+     */
+    private void printHistory(PrintHistoryMsg msg) {
+        System.out.printf("%02d: %s\n", this.id, this.chatHistory);
+    }
+
+
+
+    //         _   _          _           _                     _____
+    //        | | | |   ___  | |  _ __   (_)  _ __     __ _    |  ___|  _   _   _ __     ___   ___
+    //        | |_| |  / _ \ | | | '_ \  | | | '_ \   / _` |   | |_    | | | | | '_ \   / __| / __|
+    //        |  _  | |  __/ | | | |_) | | | | | | | | (_| |   |  _|   | |_| | | | | | | (__  \__ \
+    //        |_| |_|  \___| |_| | .__/  |_| |_| |_|  \__, |   |_|      \__,_| |_| |_|  \___| |___/
+    //                           |_|                  |___/
+
+
+    /*
+     * First I update my sendCount
+     * Init of the ChatMsg class
+     * Print of the msg and the id
+     * Multicast of the message
+     * appentToHistory
+     */
+    private void sendChatMsg() {
         this.sendCount++;
-        ChatMsg m = new ChatMsg(topic, n, this.id, this.vc);
-        System.out.printf("%02d: %s%02d\n", this.id, topic, n);
+        ChatMsg m = new ChatMsg(this.id,"[~" + numberToString((int) (Math.random()*1000000)%99999) + "]");
+        System.err.print( "Message in multicast -> id:" + this.id + ", text: " + m.text +"\n");
         multicast(m);
         appendToHistory(m); // append the sent message
     }
 
 
-    //We model random network delays with this code
+    /*
+     * We model random network delays with this code
+     */
     private void multicast(Serializable m) { // our multicast implementation
         List<ActorRef> shuffledGroup = new ArrayList<>(group);
         Collections.shuffle(shuffledGroup);
@@ -102,110 +258,46 @@ class Chatter extends AbstractActor {
         }
     }
 
-  /*private void multicast(Serializable m) { // our multicast implementation
-    for (ActorRef p: group) {
-    if (!p.equals(getSelf())) // not sending to self
-    p.tell(m, getSelf());
-    }
-    }*/
-
-    // Here we define the mapping between the received message types
-    // and our actor methods
-    @Override
-    public Receive createReceive() {
-        return receiveBuilder()
-                .match(JoinGroupMsg.class,    this::onJoinGroupMsg)
-                .match(StartChatMsg.class,    this::onStartChatMsg)
-                .match(ChatMsg.class,         this::onChatMsg)
-                .match(PrintHistoryMsg.class, this::printHistory)
-                .build();
-    }
 
 
-
-
-    private void onJoinGroupMsg(JoinGroupMsg msg) {
-        this.group = msg.group;
-        // create the vector clock
-        this.vc = new int[this.group.size()];
-        System.out.printf("%s: joining a group of %d peers with ID %02d\n",
-                getSelf().path().name(), this.group.size(), this.id);
-    }
-
-
-    private void onStartChatMsg(StartChatMsg msg) {
-        sendChatMsg(myTopic, 0); // start topic with message 0
-    }
-
-    private void onChatMsg(ChatMsg msg) {
-
-        if (canDeliver(msg)){
-            while (msg != null) {
-                updateLocalClock(msg);
-                deliver(msg);
-                msg = findDeliverable();  // try to find other messages to deliver
-            }
-        }
-        else {
-            this.mq.add(msg);   // cannot deliver m right now, putting it on hold
-            System.out.printf("%02d: enqueue from %02d %s local: %s queue length: %d\n",
-                    this.id, msg.senderId,
-                    Arrays.toString(msg.vc), Arrays.toString(this.vc),
-                    mq.size());
-        }
-    }
-
-    // find a message in the queue that can be delivered now
-    // if found, remove it from the queue and return it
-    private ChatMsg findDeliverable() {
-        Iterator<ChatMsg> I = mq.iterator();
-        while (I.hasNext()) {
-            ChatMsg m = I.next();
-            if (canDeliver(m)) {
-                I.remove();
-                return m;
-            }
-        }
-        return null;        // nothing can be delivered right now
-    }
-
-    private boolean canDeliver(ChatMsg incoming) {
-        if (incoming.vc[incoming.senderId] != vc[incoming.senderId] + 1)
-            return false;
-
-        for (int i=0; i<vc.length; i++) {
-            if (i!=incoming.senderId && incoming.vc[i] > vc[i])
-                return false;
-        }
-        return true;
-    }
-
-    private void updateLocalClock(ChatMsg m) {
-        for (int i=0; i<vc.length; i++)
-            vc[i] = (m.vc[i] > vc[i]) ? m.vc[i] : vc[i];
-    }
-
+    /*
+     *  When a Message is stable, Hence I have received another message from the same sender (ò.ò) OOOOMMMMGGGGG
+     *  I happend it to history and I deliver/drop it
+     *  then If I have other msg to send I do it
+     */
     private void deliver(ChatMsg m) {
-        // Our "chat application" appends all the received messages to the
-        // chatHistory and replies if the topic of the message is interesting
+
         appendToHistory(m);
+        System.out.println("\u001B[35m" + "Message \"" + m.text + "\" from " + m.senderId + " deliver to Node: " + this.id);
 
-        if (myTopic != null && m.topic.equals(myTopic)  // the message is on my topic
-                && sendCount < N_MESSAGES) // I still have something to say
-        {
-            final String topic;   // "topic" of the conversation
-            final int n;          // the number of the reply in the current topic
-            final int senderId;   // the ID of the message sender
-            // reply to the received message with an incremented value and the same topic
-            sendChatMsg(m.topic, m.n+1);
+        if(sendCount < N_MESSAGES){
+            sendChatMsg();
         }
+
     }
 
+
+    /*
+     * Append to the History
+     */
     private void appendToHistory(ChatMsg m) {
-        this.chatHistory.append(m.topic + m.n + " ");
+        this.chatHistory.append(  "[" + m.senderId + "," + m.text + "]");
     }
 
-    private void printHistory(PrintHistoryMsg msg) {
-        System.out.printf("%02d: %s\n", this.id, this.chatHistory);
+
+    /*
+     * Transform a Number to A String
+     */
+    private String numberToString(int number){
+        String ret = "";
+        String digits = Integer.toString(number);
+        for(int i = 0; i < digits.length(); i++){
+            try{ret = ret.concat(getCharForNumber(Integer.parseInt(digits.charAt(i)+"")));}
+            catch (Exception e) {ret = ret.concat(Integer.toString((int)Math.random()*10 % 4));}
+        }
+        return ret;
+    }
+    private String getCharForNumber(int i) {
+        return i > 0 && i < 27 ? String.valueOf((char)(i + 64)) : null;
     }
 }
