@@ -12,7 +12,7 @@ import it.unitn.ds1.project.Chatter.StartChatMsg;
 import it.unitn.ds1.project.Chatter.PrintHistoryMsg;
 
 public class MulticastApp {
-    
+
 
     public static void main(String[] args) {
 
@@ -26,19 +26,19 @@ public class MulticastApp {
         // the first four peers will be participating in conversations
         group.add(system.actorOf(
                 Chatter.props(id++),  // this one will start the topic "a"
-                "chatter0_Mario"));
+                "Node0"));
 
         group.add(system.actorOf(
                 Chatter.props(id++), // this one will catch up the topic "a"
-                "chatter1_Sandrone"));
+                "Node1"));
 
         group.add(system.actorOf(
                 Chatter.props(id++),  // this one will start the topic "a"
-                "chatter2_Gianno"));
+                "Node2"));
 
         group.add(system.actorOf(
                 Chatter.props(id++), // this one will catch up the topic "a"
-                "chatter3_Sale"));
+                "Node3"));
 
         // ensure that no one can modify the group
         group = Collections.unmodifiableList(group);
