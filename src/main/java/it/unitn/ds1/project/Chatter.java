@@ -7,7 +7,6 @@ import akka.actor.AbstractActor;
 import java.util.*;
 import java.io.Serializable;
 import akka.actor.Props;
-import scala.Int;
 
 import java.lang.Thread;
 import java.lang.InterruptedException;
@@ -34,17 +33,17 @@ class Chatter extends AbstractActor {
     /*
      * Limit of the messages for the node
      */
-    private final static int N_MESSAGES = 3;
+    public final static int N_MESSAGES = 3;
 
     /*
      * The list of peers (the multicast group)
      */
-    private List<ActorRef> group;
+    public List<ActorRef> group;
 
     /*
      * Random Number used to random multicast
      */
-    private Random rnd = new Random();
+    public Random rnd = new Random();
 
 
 
@@ -63,25 +62,25 @@ class Chatter extends AbstractActor {
     /*
      *    ID of the current actor
      */
-    private final int id;
+    public final int id;
 
     /*
      *   The local hashMap, in which we keep the last with the ActorRef and its own LastMessage
      *   (used as Buffer)
      */
-    private HashMap<ActorRef,ChatMsg> lastMessages = new HashMap<>();
+    public HashMap<ActorRef,ChatMsg> lastMessages = new HashMap<>();
 
 
     /*
      * The chat history
      */
-    private StringBuffer chatHistory = new StringBuffer();
+    public StringBuffer chatHistory = new StringBuffer();
 
 
     /*
      * Actor Constructor
      */
-    private Chatter(int id) {
+    Chatter(int id) {
         this.id = id;
     }
 
@@ -105,14 +104,9 @@ class Chatter extends AbstractActor {
      */
     @Override
     public Receive createReceive() {
-        return receiveBuilder()
-                .match(JoinGroupMsg.class,    this::onJoinGroupMsg)    //#1
-                .match(StartChatMsg.class,    this::onStartChatMsg)    //#2
-                .match(ChatMsg.class,         this::onChatMsg)         //#3
-                .match(PrintHistoryMsg.class, this::printHistory)      //#4
-                .build();
+        // Empty mapping: we'll define it in the inherited classes
+        return receiveBuilder().build();
     }
-
 
 
     /*
@@ -120,9 +114,9 @@ class Chatter extends AbstractActor {
      * Start message that informs every chat participant about its peers
      */
     public static class JoinGroupMsg implements Serializable {
-        private final List<ActorRef> group; // list of group members
+        public final List<ActorRef> group; // list of group members
         public JoinGroupMsg(List<ActorRef> group) {
-            this.group = Collections.unmodifiableList(group);
+            this.group = group;
         }
 
     }
@@ -157,8 +151,42 @@ class Chatter extends AbstractActor {
 
 
 
+    /*
+     * #5
+     * I have to ask to the Coordinator if I can join
+     */
+    public static class JoinRequest implements Serializable {}
 
-     //             _             _                                ____           _
+
+    /*
+     * #6
+     * Message with the new view
+     * Same class for both cohort and coordinator, but different in the action implementation
+     * fot this reason this Class is map in the subclasses
+     */
+    public static class NewView implements Serializable{
+        public final List<ActorRef> group;    // an array of group members
+        public NewView(List<ActorRef> group) {
+            // Copying the group as an unmodifiable list
+            this.group = new ArrayList<ActorRef>(group);
+        }
+    }
+
+
+    /*
+     * #7
+     * I can join the team, yea
+     */
+    public static class CanJoin implements Serializable{
+        public final List<ActorRef> group;    // an array of group members
+        public CanJoin(List<ActorRef> group) {
+            // Copying the group as an unmodifiable list
+            this.group = new ArrayList<ActorRef>(group);
+        }
+    }
+
+
+    //             _             _                                ____           _
      //            / \      ___  | |_    ___    _ __              | __ )    ___  | |__     __ _  __   __
      //           / _ \    / __| | __|  / _ \  | '__|    _____    |  _ \   / _ \ | '_ \   / _` | \ \ / /
      //          / ___ \  | (__  | |_  | (_) | | |      |_____|   | |_) | |  __/ | | | | | (_| |  \ V /
@@ -170,11 +198,11 @@ class Chatter extends AbstractActor {
      * When a node enters in the group, it first of all get all the peers(init the group variable)
      * Then print the the fact that it joined
      */
-    private void onJoinGroupMsg(JoinGroupMsg msg) {
+    public void onJoinGroupMsg(JoinGroupMsg msg) {
 
         this.group = msg.group;
 
-        System.out.printf("%s: joining a group of %d peers with ID %02d\n",
+        System.out.printf("\u001B[36m %s: joining a group of %d peers with ID %02d\n",
                 getSelf().path().name(), this.group.size(), this.id);
     }
 
@@ -184,7 +212,7 @@ class Chatter extends AbstractActor {
      * The first Time I want to send a message a pass through this method then,
      * look at sendChatMsg Method
      */
-    private void onStartChatMsg(StartChatMsg msg) {
+    public void onStartChatMsg(StartChatMsg msg) {
         sendChatMsg(); // start with message 0
     }
 
@@ -196,7 +224,7 @@ class Chatter extends AbstractActor {
      * I replace the last message with the new one
      * I deliver/drop the Old Message
      */
-    private void onChatMsg(ChatMsg msg) {
+    public void onChatMsg(ChatMsg msg) {
 
         ChatMsg drop;
         if(lastMessages.get(group.get(msg.senderId)) != null){
@@ -213,7 +241,7 @@ class Chatter extends AbstractActor {
      * #4
      * Print the History of this node
      */
-    private void printHistory(PrintHistoryMsg msg) {
+    public void printHistory(PrintHistoryMsg msg) {
         System.out.printf("%02d: %s\n", this.id, this.chatHistory);
     }
 
@@ -234,7 +262,7 @@ class Chatter extends AbstractActor {
      * Multicast of the message
      * appentToHistory
      */
-    private void sendChatMsg() {
+    public void sendChatMsg() {
         this.sendCount++;
         ChatMsg m = new ChatMsg(this.id,"[~" + numberToString((int) (Math.random()*1000000)%99999) + "]");
         System.err.print( "Message in multicast -> id:" + this.id + ", text: " + m.text +"\n");
@@ -246,7 +274,7 @@ class Chatter extends AbstractActor {
     /*
      * We model random network delays with this code
      */
-    private void multicast(Serializable m) { // our multicast implementation
+    public void multicast(Serializable m) { // our multicast implementation
         List<ActorRef> shuffledGroup = new ArrayList<>(group);
         Collections.shuffle(shuffledGroup);
         for (ActorRef p: shuffledGroup) {
@@ -265,7 +293,7 @@ class Chatter extends AbstractActor {
      *  I happend it to history and I deliver/drop it
      *  then If I have other msg to send I do it
      */
-    private void deliver(ChatMsg m) {
+    public void deliver(ChatMsg m) {
 
         appendToHistory(m);
         System.out.println("\u001B[35m" + "Message \"" + m.text + "\" from " + m.senderId + " deliver to Node: " + this.id);
@@ -280,7 +308,7 @@ class Chatter extends AbstractActor {
     /*
      * Append to the History
      */
-    private void appendToHistory(ChatMsg m) {
+    public void appendToHistory(ChatMsg m) {
         this.chatHistory.append(  "[" + m.senderId + "," + m.text + "]");
     }
 
@@ -288,7 +316,7 @@ class Chatter extends AbstractActor {
     /*
      * Transform a Number to A String
      */
-    private String numberToString(int number){
+    public String numberToString(int number){
         String ret = "";
         String digits = Integer.toString(number);
         for(int i = 0; i < digits.length(); i++){
@@ -297,7 +325,7 @@ class Chatter extends AbstractActor {
         }
         return ret;
     }
-    private String getCharForNumber(int i) {
+    public String getCharForNumber(int i) {
         return i > 0 && i < 27 ? String.valueOf((char)(i + 64)) : null;
     }
 }

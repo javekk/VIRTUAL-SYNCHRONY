@@ -23,25 +23,19 @@ public class MulticastApp {
 
         int id = 0;
 
-        // the first four peers will be participating in conversations
+        //the coordinator
         group.add(system.actorOf(
-                Chatter.props(id++),  // this one will start the topic "a"
+                NodeCoordinator.props(id++),
                 "Node0"));
 
         group.add(system.actorOf(
-                Chatter.props(id++), // this one will catch up the topic "a"
+                NodePartecipant.props(id++),
                 "Node1"));
 
         group.add(system.actorOf(
-                Chatter.props(id++),  // this one will start the topic "a"
+                NodePartecipant.props(id++),
                 "Node2"));
 
-        group.add(system.actorOf(
-                Chatter.props(id++), // this one will catch up the topic "a"
-                "Node3"));
-
-        // ensure that no one can modify the group
-        group = Collections.unmodifiableList(group);
 
         // send the group member list to everyone in the group
         JoinGroupMsg join = new JoinGroupMsg(group);
@@ -53,6 +47,17 @@ public class MulticastApp {
 
         try {
             System.out.println("\n\n>>> Wait for the chats to stop and press ENTER <<<\n\n");
+
+            /*
+             * After a while I insert Node3
+             */
+            Thread.sleep(2000);
+            ActorRef node3 = system.actorOf(
+                    NodePartecipant.props(id++), // this one will catch up the topic "a"
+                    "Node3");
+            group.get(0).tell(new Chatter.JoinRequest(), node3);
+
+
             System.in.read();
 
             PrintHistoryMsg msg = new PrintHistoryMsg();
@@ -62,7 +67,7 @@ public class MulticastApp {
             System.out.println("\n\n>>> Press ENTER to exit <<<\n\n");
             System.in.read();
         }
-        catch (IOException ioe) {}
+        catch (Exception ioe) {}
         system.terminate();
     }
 }

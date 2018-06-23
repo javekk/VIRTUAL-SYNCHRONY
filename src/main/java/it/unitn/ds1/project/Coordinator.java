@@ -11,7 +11,7 @@ import java.util.Set;
 public class Coordinator extends Node {
 
     // here all the nodes that sent YES are collected
-    private Set<ActorRef> yesVoters = new HashSet<>();
+    public Set<ActorRef> yesVoters = new HashSet<>();
 
     boolean allVotedYes() { // returns true if all voted YES
         return yesVoters.size() >= App.N_INITIAL_PARTICIPANTS;
