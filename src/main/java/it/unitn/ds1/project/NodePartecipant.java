@@ -24,11 +24,9 @@ public class NodePartecipant extends Chatter {
     /*
      * Actor Constructor
      */
-    NodePartecipant(int id) {
-        super(id);
-    }
-    static public Props props(int id) {
-        return Props.create(NodePartecipant.class, () -> new NodePartecipant(id));
+
+    static public Props props() {
+        return Props.create(NodePartecipant.class, () -> new NodePartecipant());
     }
 
 
@@ -55,6 +53,7 @@ public class NodePartecipant extends Chatter {
                 .match(PrintHistoryMsg.class, this::printHistory)      //#4
                 .match(NewView.class, this::onGetNewView)            //#5
                 .match(CanJoin.class, this::join)                    //#6
+                .match(NewId.class,    this::onNewId)      //#8
                 .build();
     }
 
@@ -74,7 +73,8 @@ public class NodePartecipant extends Chatter {
      */
     public void onGetNewView(NewView newView){
         this.group = newView.group;
-        System.out.println("Node " + getSelf().path().name() + " Install a new View: ");
+        System.out.println( "\u001B[33" +
+                "m" + "Node " + getSelf().path().name() + " Install a new View: ");
 
     }
 
@@ -87,5 +87,14 @@ public class NodePartecipant extends Chatter {
         JoinGroupMsg join = new JoinGroupMsg(cj.group);
         this.getSelf().tell(join, null);
         this.getSelf().tell(new StartChatMsg(), getSelf());
+    }
+
+
+    /*
+     * #8
+     * I have a new ID, yea
+     */
+    public void onNewId(NewId newId){
+        this.id = newId.newId;
     }
 }

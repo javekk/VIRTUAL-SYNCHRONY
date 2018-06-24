@@ -3,9 +3,7 @@ package it.unitn.ds1.project;
 import akka.actor.ActorRef;
 import akka.actor.Props;
 
-import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 public class NodeCoordinator extends Chatter {
@@ -20,12 +18,22 @@ public class NodeCoordinator extends Chatter {
 
 
     /*
+     * id counter
+     */
+    private int idCounter = 0;
+
+
+    /*
      * Actor Constructor
      */
-    public NodeCoordinator(int id) {
-        super(id);
+    NodeCoordinator(int id) {
+        this.id = id;
+        if(this.group == null){
+            this.group = new ArrayList<>();
+            this.group.add(getSelf());
+        }
     }
-    static public Props props(int id) {
+    static Props props(int id) {
         return Props.create(NodeCoordinator.class, () -> new NodeCoordinator(id));
     }
 
@@ -70,21 +78,24 @@ public class NodeCoordinator extends Chatter {
 
 
         System.out.println("\u001B[34m" + getSender().path().name() + " asking for joining");
-        List<ActorRef> group = this.group;
-        group.add(getSender());
+        /*
+         * Send the new id to the new node
+         */
+        getSender().tell(new NewId(++idCounter), getSelf());
+
         /*
          * I send to anybody the new view with the new peer
          */
-        this.multicast(new NewView(group));
-        System.out.println("\u001B[34m______send new view");
-        /*
-         * I install the new view
-         */
-        this.group = group;
+
+        this.group.add(getSender());
+        this.multicast(new NewView(this.group));
+        System.out.println("\u001B[34m" + getSelf().path().name() + " sending new view with " + getSender().path().name());
+
         /*
          * Finally I can send the ok for enter to the requester
          */
-        getSender().tell(new CanJoin(group), getSelf());
+
+        getSender().tell(new CanJoin(this.group), getSelf());
 
     }
 

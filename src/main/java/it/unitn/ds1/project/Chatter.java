@@ -62,7 +62,7 @@ class Chatter extends AbstractActor {
     /*
      *    ID of the current actor
      */
-    public final int id;
+    public int id = 0;
 
     /*
      *   The local hashMap, in which we keep the last with the ActorRef and its own LastMessage
@@ -76,17 +76,6 @@ class Chatter extends AbstractActor {
      */
     public StringBuffer chatHistory = new StringBuffer();
 
-
-    /*
-     * Actor Constructor
-     */
-    Chatter(int id) {
-        this.id = id;
-    }
-
-    static Props props(int id) {
-        return Props.create(Chatter.class, () -> new Chatter(id));
-    }
 
 
     //         __  __                   _____                                             ____   _
@@ -178,13 +167,26 @@ class Chatter extends AbstractActor {
      * I can join the team, yea
      */
     public static class CanJoin implements Serializable{
-        public final List<ActorRef> group;    // an array of group members
+        public final List<ActorRef> group;    // an array of group membersì
         public CanJoin(List<ActorRef> group) {
             // Copying the group as an unmodifiable list
             this.group = new ArrayList<ActorRef>(group);
         }
     }
 
+
+
+    /*
+     * #8
+     * new Id for the new Node joined
+     */
+    public static class NewId implements Serializable{
+        public final int newId;
+        public NewId (int newId ) {
+            // Copying the group as an unmodifiable list
+            this.newId = newId;
+        }
+    }
 
     //             _             _                                ____           _
      //            / \      ___  | |_    ___    _ __              | __ )    ___  | |__     __ _  __   __
@@ -227,7 +229,7 @@ class Chatter extends AbstractActor {
     public void onChatMsg(ChatMsg msg) {
 
         ChatMsg drop;
-        if(lastMessages.get(group.get(msg.senderId)) != null){
+        if (lastMessages.get(group.get(msg.senderId)) != null) {
             drop = lastMessages.get(group.get(msg.senderId));
             System.out.println("\u001B[32m" + "Message \"" + drop.text + "\" " + "from Node: " + msg.senderId + " dropped by Node: " + this.id);
 

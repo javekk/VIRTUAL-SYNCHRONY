@@ -24,26 +24,25 @@ public class MulticastApp {
         int id = 0;
 
         //the coordinator
-        group.add(system.actorOf(
-                NodeCoordinator.props(id++),
-                "Node0"));
+        ActorRef coordinator = system.actorOf(
+                NodeCoordinator.props(0),
+                "Node0");
+        group.add(coordinator);
 
-        group.add(system.actorOf(
-                NodePartecipant.props(id++),
-                "Node1"));
+        ActorRef node1 = system.actorOf(
+                NodePartecipant.props(),
+                "Node1");
+        group.add(node1);
 
-        group.add(system.actorOf(
-                NodePartecipant.props(id++),
-                "Node2"));
+        ActorRef node2 = system.actorOf(
+                NodePartecipant.props(),
+                "Node2");
+        group.add(node2);
 
 
-        // send the group member list to everyone in the group
-        JoinGroupMsg join = new JoinGroupMsg(group);
-        for (ActorRef peer: group) {
-            peer.tell(join, null);
-        }
+        coordinator.tell(new Chatter.JoinRequest(), node1);
+        coordinator.tell(new Chatter.JoinRequest(), node2);
 
-        group.get(0).tell(new StartChatMsg(), null);
 
         try {
             System.out.println("\n\n>>> Wait for the chats to stop and press ENTER <<<\n\n");
@@ -53,10 +52,10 @@ public class MulticastApp {
              */
             Thread.sleep(2000);
             ActorRef node3 = system.actorOf(
-                    NodePartecipant.props(id++), // this one will catch up the topic "a"
+                    NodePartecipant.props(), // this one will catch up the topic "a"
                     "Node3");
-            group.get(0).tell(new Chatter.JoinRequest(), node3);
-
+            coordinator.tell(new Chatter.JoinRequest(), node3);
+            group.add(node3);
 
             System.in.read();
 
