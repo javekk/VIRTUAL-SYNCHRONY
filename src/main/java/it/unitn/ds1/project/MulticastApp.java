@@ -57,14 +57,20 @@ public class MulticastApp {
             coordinator.tell(new Chatter.JoinRequest(), node3);
             group.add(node3);
 
+            /*
+             * After a while I insert Node4
+             */
+            Thread.sleep(6000);
+            ActorRef node4 = system.actorOf(
+                    NodePartecipant.props(), // this one will catch up the topic "a"
+                    "Node4");
+            coordinator.tell(new Chatter.JoinRequest(), node4);
+            group.add(node4);
+
+
             System.in.read();
 
-            PrintHistoryMsg msg = new PrintHistoryMsg();
-            for (ActorRef peer: group) {
-                peer.tell(msg, null);
-            }
-            System.out.println("\n\n>>> Press ENTER to exit <<<\n\n");
-            System.in.read();
+
         }
         catch (Exception ioe) {}
         system.terminate();

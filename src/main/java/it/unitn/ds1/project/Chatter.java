@@ -3,13 +3,16 @@ package it.unitn.ds1.project;
 
 import akka.actor.ActorRef;
 import akka.actor.AbstractActor;
+import scala.concurrent.duration.Duration;
 
 import java.util.*;
 import java.io.Serializable;
-import akka.actor.Props;
+
 
 import java.lang.Thread;
 import java.lang.InterruptedException;
+import java.util.concurrent.TimeUnit;
+
 
 
 
@@ -33,7 +36,7 @@ class Chatter extends AbstractActor {
     /*
      * Limit of the messages for the node
      */
-    public final static int N_MESSAGES = 3;
+    public final static int N_MESSAGES = 5;
 
     /*
      * The list of peers (the multicast group)
@@ -45,6 +48,11 @@ class Chatter extends AbstractActor {
      */
     public Random rnd = new Random();
 
+    /*
+     * Timeouts
+     */
+    public final static int NEW_MESSAGE_TIMEOUT = 2000;  // timeout for the decision, ms
+    public final static int CRASH_DETECTION_TIMEOUT = 4000;  // timeout for the decision, ms
 
 
     //         _   _               _            ____
@@ -215,7 +223,12 @@ class Chatter extends AbstractActor {
      * look at sendChatMsg Method
      */
     public void onStartChatMsg(StartChatMsg msg) {
-        sendChatMsg(); // start with message 0
+        getContext().system().scheduler().schedule(
+                Duration.create((int)(3000*Math.random()), TimeUnit.MILLISECONDS),
+                Duration.create((int)(3000*Math.random()), TimeUnit.MILLISECONDS),
+                () -> sendChatMsg(),
+                getContext().system().dispatcher());
+
     }
 
 
@@ -299,10 +312,6 @@ class Chatter extends AbstractActor {
 
         appendToHistory(m);
         System.out.println("\u001B[35m" + "Message \"" + m.text + "\" from " + m.senderId + " deliver to Node: " + this.id);
-
-        if(sendCount < N_MESSAGES){
-            sendChatMsg();
-        }
 
     }
 
