@@ -86,10 +86,9 @@ public class NodeCoordinator extends Chatter {
         /*
          * I send to anybody the new view with the new peer
          */
-
+        System.out.println("\u001B[34m" + getSelf().path().name() + " sending new view with " + getSender().path().name());
         this.group.add(getSender());
         this.multicast(new NewView(this.group));
-        System.out.println("\u001B[34m" + getSelf().path().name() + " sending new view with " + getSender().path().name());
 
         /*
          * Finally I can send the ok for enter to the requester
