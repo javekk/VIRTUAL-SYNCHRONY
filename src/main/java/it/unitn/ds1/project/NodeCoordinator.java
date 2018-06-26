@@ -164,9 +164,6 @@ public class NodeCoordinator extends Chatter {
          */
         System.out.println("\u001B[34m" + getSelf().path().name() + " sending new view with " + this.view.toString());
         this.group.add(getSender());
-        this.multicast(new NewView(this.group, this.view, this.viewCounter));
-
-
         this.fromWhomTheMessagesArrived.put(getSender(), true);
         this.multicast(new NewView(this.group, this.view, this.viewCounter));
 
