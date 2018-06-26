@@ -201,7 +201,7 @@ public class NodeCoordinator extends Chatter {
                 this.fromWhomTheMessagesArrived.remove(a);
                 this.group.remove(a);
                 for(int i = 0; i < view.size(); i++){
-                    if(view.get(i).equals(a.path().name())) view.remove(i);
+                    if(view.get(i).equals(a.path().name().substring(4))) view.remove(i);
                 }
              }
             this.multicast(new NewView(this.group, this.view, this.viewCounter));
