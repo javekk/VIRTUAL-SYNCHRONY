@@ -67,4 +67,5 @@ gradle-app.setting
 # gradle/wrapper/gradle-wrapper.properties
 
 # log files
-.txt
+participant-log.txt
+multicast-log.txt
