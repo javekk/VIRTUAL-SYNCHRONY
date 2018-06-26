@@ -175,7 +175,7 @@ class Chatter extends AbstractActor {
      * I can join the team, yea
      */
     public static class CanJoin implements Serializable{
-        public final List<ActorRef> group;    // an array of group membersì
+        public final List<ActorRef> group;    // an array of group members
         public CanJoin(List<ActorRef> group) {
             // Copying the group as an unmodifiable list
             this.group = new ArrayList<ActorRef>(group);

@@ -22,6 +22,7 @@ public class NodeCoordinator extends Chatter {
      */
     private int idCounter = 0;
 
+    public List<String> view;
 
     /*
      * Actor Constructor
@@ -31,6 +32,8 @@ public class NodeCoordinator extends Chatter {
         if(this.group == null){
             this.group = new ArrayList<>();
             this.group.add(getSelf());
+            this.view = new ArrayList<>();
+            this.view.add(getSelf().path().name());
         }
     }
     static Props props(int id) {
@@ -82,11 +85,12 @@ public class NodeCoordinator extends Chatter {
          * Send the new id to the new node
          */
         getSender().tell(new NewId(++idCounter), getSelf());
+        this.view.add(getSender().path().name());
 
         /*
          * I send to anybody the new view with the new peer
          */
-        System.out.println("\u001B[34m" + getSelf().path().name() + " sending new view with " + getSender().path().name());
+        System.out.println("\u001B[34m" + getSelf().path().name() + " sending new view with " + this.view.toString());
         this.group.add(getSender());
         this.multicast(new NewView(this.group));
 
