@@ -84,6 +84,12 @@ class Chatter extends AbstractActor {
     public StringBuffer chatHistory = new StringBuffer();
 
 
+    /*
+     * Am I crashed?
+     */
+    public  boolean crashed = false;
+
+
 
     //         __  __                   _____                                             ____   _
     //        |  \/  |  ___    __ _    |_   _|  _   _   _ __     ___   ___               / ___| | |   __ _   ___   ___    ___   ___
@@ -259,6 +265,7 @@ class Chatter extends AbstractActor {
      * appentToHistory
      */
     public void sendChatMsg() {
+        if (crashed) return;
         this.sendCount++;
         ChatMsg m = new ChatMsg(this.id,"[~" + numberToString((int) (Math.random()*1000000)%99999) + "]");
         System.err.print( "Message in multicast -> id:" + this.id + ", text: " + m.text +"\n");

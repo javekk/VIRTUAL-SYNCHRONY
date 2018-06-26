@@ -58,7 +58,7 @@ public class MulticastApp {
             ActorRef node4 = system.actorOf(
                     NodePartecipant.props(), // this one will catch up the topic "a"
                     "Node4");
-            coordinator.tell(new Chatter.JoinRequest(), node4);
+            node3.tell(new NodePartecipant.Crash(30000), null);
             group.add(node4);
 
 

@@ -3,8 +3,10 @@ package it.unitn.ds1.project;
 
 import akka.actor.ActorRef;
 import akka.actor.Props;
+import scala.concurrent.duration.Duration;
 
 import java.io.Serializable;
+import java.util.concurrent.TimeUnit;
 
 public class NodePartecipant extends Chatter {
 
@@ -19,6 +21,7 @@ public class NodePartecipant extends Chatter {
      * This is the coordinator. id 0 default
      */
     public int coordinatorId;
+
 
 
     /*
@@ -54,10 +57,22 @@ public class NodePartecipant extends Chatter {
                 .match(NewView.class, this::onGetNewView)            //#5
                 .match(CanJoin.class, this::join)                    //#6
                 .match(NewId.class,    this::onNewId)      //#8
+                .match(Crash.class,    this::onCrash)      //#8
                 .build();
     }
 
 
+
+    /*
+     * I wanna crash
+     */
+    public static class Crash implements Serializable {
+        public final int delay;
+        public Crash(int delay) {
+            this.delay = delay;
+        }
+
+    }
 
     //             _             _                                ____           _
     //            / \      ___  | |_    ___    _ __              | __ )    ___  | |__     __ _  __   __
@@ -75,6 +90,8 @@ public class NodePartecipant extends Chatter {
      * I deliver/drop the Old Message
      */
     public void onChatMsg(ChatMsg msg) {
+
+        if(crashed) return;
 
         ChatMsg drop;
         if (lastMessages.get(group.get(msg.senderId)) != null) {
@@ -114,6 +131,7 @@ public class NodePartecipant extends Chatter {
         JoinGroupMsg join = new JoinGroupMsg(cj.group);
         this.getSelf().tell(join, null);
         this.getSelf().tell(new StartChatMsg(), getSelf());
+        this.crashed = false;
     }
 
 
@@ -123,5 +141,15 @@ public class NodePartecipant extends Chatter {
      */
     public void onNewId(NewId newId){
         this.id = newId.newId;
+    }
+
+
+
+
+    // emulate a crash and a recovery in a given time
+    public void onCrash(Crash c) throws InterruptedException {
+        crashed = true;
+        System.out.println("CRASH!!!!!!!" + getSelf().path().name());
+
     }
 }
