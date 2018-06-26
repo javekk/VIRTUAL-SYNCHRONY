@@ -4,12 +4,6 @@ import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
 import java.util.List;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.io.IOException;
-
-import it.unitn.ds1.project.Chatter.JoinGroupMsg;
-import it.unitn.ds1.project.Chatter.StartChatMsg;
-import it.unitn.ds1.project.Chatter.PrintHistoryMsg;
 
 public class MulticastApp {
 
@@ -64,7 +58,7 @@ public class MulticastApp {
             ActorRef node4 = system.actorOf(
                     NodePartecipant.props(), // this one will catch up the topic "a"
                     "Node4");
-            coordinator.tell(new Chatter.JoinRequest(), node4);
+            node3.tell(new NodePartecipant.Crash(30), null);
             group.add(node4);
 
 

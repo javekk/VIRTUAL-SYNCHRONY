@@ -61,12 +61,6 @@ class Chatter extends AbstractActor {
      */
     public Random rnd = new Random();
 
-    /*
-     * Timeouts
-     */
-    public final static int NEW_MESSAGE_TIMEOUT = 2000;  // timeout for the decision, ms
-    public final static int CRASH_DETECTION_TIMEOUT = 4000;  // timeout for the decision, ms
-
 
     //         _   _               _            ____
     //        | \ | |   ___     __| |   ___    |  _ \   _ __    ___    _ __    ___
@@ -102,6 +96,12 @@ class Chatter extends AbstractActor {
      * The chat history
      */
     public StringBuffer chatHistory = new StringBuffer();
+
+
+    /*
+     * Am I crashed?
+     */
+    public  boolean crashed = false;
 
 
 
@@ -247,31 +247,11 @@ class Chatter extends AbstractActor {
      */
     public void onStartChatMsg(StartChatMsg msg) {
         getContext().system().scheduler().schedule(
-                Duration.create((int)(3000*Math.random()), TimeUnit.MILLISECONDS),
-                Duration.create((int)(3000*Math.random()), TimeUnit.MILLISECONDS),
+                Duration.create((int)(7000*Math.random()), TimeUnit.MILLISECONDS),
+                Duration.create((int)(7000*Math.random()), TimeUnit.MILLISECONDS),
                 () -> sendChatMsg(),
                 getContext().system().dispatcher());
 
-    }
-
-
-    /*
-     * #3
-     * When we received a Message
-     * I get the last Message from the sender(to drop)
-     * I replace the last message with the new one
-     * I deliver/drop the Old Message
-     */
-    public void onChatMsg(ChatMsg msg) {
-
-        ChatMsg drop;
-        if (lastMessages.get(group.get(msg.senderId)) != null) {
-            drop = lastMessages.get(group.get(msg.senderId));
-            System.out.println("\u001B[32m" + "Message \"" + drop.text + "\" " + "from Node: " + msg.senderId + " dropped by Node: " + this.id);
-
-        }
-        lastMessages.put(group.get(msg.senderId), msg);
-        deliver(msg);
     }
 
 
@@ -301,11 +281,12 @@ class Chatter extends AbstractActor {
      * appentToHistory
      */
     public void sendChatMsg() {
+        if (crashed) return;
         this.sendCount++;
         ChatMsg m = new ChatMsg(this.id,"[~" + numberToString((int) (Math.random()*1000000)%99999) + "]");
         out = this.id + " send multicast " + m.text + " within " + this.viewCounter + "\n";
         MulticastLog(out);
-        System.err.print( "Message in multicast -> id:" + this.id + ", text: " + m.text +"\n");
+        System.err.print( "Message in multicast -> id: " + this.id + ", text: " + m.text +"\n");
         multicast(m);
         appendToHistory(m); // append the sent message
     }
