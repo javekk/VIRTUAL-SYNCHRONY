@@ -68,6 +68,29 @@ public class NodePartecipant extends Chatter {
 
 
     /*
+     * #3
+     * When we received a Message
+     * I get the last Message from the sender(to drop)
+     * I replace the last message with the new one
+     * I deliver/drop the Old Message
+     */
+    public void onChatMsg(ChatMsg msg) {
+
+        ChatMsg drop;
+        if (lastMessages.get(group.get(msg.senderId)) != null) {
+            drop = lastMessages.get(group.get(msg.senderId));
+            System.out.println("\u001B[32m" + "Message \"" + drop.text + "\" " + "from Node: " + msg.senderId + " dropped by Node: " + this.id);
+
+        }
+        lastMessages.put(group.get(msg.senderId), msg);
+        deliver(msg);
+    }
+
+
+
+
+
+    /*
      * #5
      * When I receive a new view, I install it, easy
      */

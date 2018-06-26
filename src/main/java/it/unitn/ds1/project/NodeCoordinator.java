@@ -2,9 +2,13 @@ package it.unitn.ds1.project;
 
 import akka.actor.ActorRef;
 import akka.actor.Props;
+import scala.concurrent.duration.Duration;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 public class NodeCoordinator extends Chatter {
 
@@ -22,7 +26,15 @@ public class NodeCoordinator extends Chatter {
      */
     private int idCounter = 0;
 
+    /*
+     *View
+     */
     public List<String> view;
+
+    /*
+     * HashMap Used for detect the crashes
+     */
+    private HashMap<ActorRef, Boolean> fromWhomTheMessagesArrived;
 
     /*
      * Actor Constructor
@@ -34,6 +46,7 @@ public class NodeCoordinator extends Chatter {
             this.group.add(getSelf());
             this.view = new ArrayList<>();
             this.view.add(getSelf().path().name());
+            this.fromWhomTheMessagesArrived = new HashMap<>();
         }
     }
     static Props props(int id) {
@@ -74,6 +87,47 @@ public class NodeCoordinator extends Chatter {
 
 
     /*
+     * Crash detection every 15 sec
+     */
+
+
+    @Override
+    public void preStart() {
+        getContext().system().scheduler().schedule(
+                Duration.create(10, TimeUnit.SECONDS),
+                Duration.create(15, TimeUnit.SECONDS),
+                () -> crashDetector(),
+                getContext().system().dispatcher());
+
+    }
+
+
+
+
+    /*
+     * #3
+     * When we received a Message
+     * I get the last Message from the sender(to drop)
+     * I replace the last message with the new one
+     * I set that I received the message
+     * I deliver/drop the Old Message
+     */
+    public void onChatMsg(ChatMsg msg) {
+
+        ChatMsg drop;
+        if (lastMessages.get(group.get(msg.senderId)) != null) {
+            drop = lastMessages.get(group.get(msg.senderId));
+            System.out.println("\u001B[32m" + "Message \"" + drop.text + "\" " + "from Node: " + msg.senderId + " dropped by Node: " + this.id);
+
+        }
+        lastMessages.put(group.get(msg.senderId), msg);
+        this.fromWhomTheMessagesArrived.replace(getSender(), true);
+        deliver(msg);
+    }
+
+
+
+    /*
      * #5
      * Coordinator has a different behavior for the same class
      */
@@ -96,6 +150,7 @@ public class NodeCoordinator extends Chatter {
          */
         System.out.println("\u001B[34m" + getSelf().path().name() + " sending new view with " + this.view.toString());
         this.group.add(getSender());
+        this.fromWhomTheMessagesArrived.put(getSender(), true);
         this.multicast(new NewView(this.group, this.view));
 
         /*
@@ -103,6 +158,37 @@ public class NodeCoordinator extends Chatter {
          */
 
         getSender().tell(new CanJoin(this.group), getSelf());
+
+    }
+
+
+    private void crashDetector(){
+
+        /*
+         * If I find some false values, means that no messages arrived from that peers
+         */
+        List<ActorRef> crashedPeers = new ArrayList<>();
+        for(Map.Entry<ActorRef, Boolean> entry : this.fromWhomTheMessagesArrived.entrySet()){
+            ActorRef key = entry.getKey();
+            Boolean value = entry.getValue();
+            if(!value) crashedPeers.add(key);
+        }
+
+        /*
+         * OMG! INDIGNAZIONE!!!!!
+         */
+        if(!crashedPeers.isEmpty()){
+            System.out.println("OMG!!! Someone is crashed!!11!! INDIGNAZIONE!!!  ___loro?->" + this.fromWhomTheMessagesArrived.toString());
+        }
+
+
+        /*
+         * Bring all to false, waiting for messages
+         */
+        for(Map.Entry<ActorRef, Boolean> entry : this.fromWhomTheMessagesArrived.entrySet()){
+            ActorRef key = entry.getKey();
+            this.fromWhomTheMessagesArrived.replace(key, false);
+        }
 
     }
 
