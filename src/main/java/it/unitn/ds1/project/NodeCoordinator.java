@@ -22,7 +22,15 @@ public class NodeCoordinator extends Chatter {
      */
     private int idCounter = 0;
 
+    /*
+     * list of names in view
+     */
     public List<String> view;
+
+    /*
+     * number of view
+     */
+    public int viewCounter = 0;
 
     /*
      * Actor Constructor
@@ -32,8 +40,9 @@ public class NodeCoordinator extends Chatter {
         if(this.group == null){
             this.group = new ArrayList<>();
             this.group.add(getSelf());
+
             this.view = new ArrayList<>();
-            this.view.add(getSelf().path().name());
+            this.view.add(getSelf().path().name().substring(4));
         }
     }
     static Props props(int id) {
@@ -89,14 +98,19 @@ public class NodeCoordinator extends Chatter {
         /*
          * Add new node to the view
          */
-        this.view.add(getSender().path().name());
+        this.view.add(getSender().path().name().substring(4));
+
+        /*
+         * Increase view number
+         */
+        this.viewCounter++;
 
         /*
          * I send to anybody the new view with the new peer
          */
         System.out.println("\u001B[34m" + getSelf().path().name() + " sending new view with " + this.view.toString());
         this.group.add(getSender());
-        this.multicast(new NewView(this.group, this.view));
+        this.multicast(new NewView(this.group, this.view, this.viewCounter));
 
         /*
          * Finally I can send the ok for enter to the requester

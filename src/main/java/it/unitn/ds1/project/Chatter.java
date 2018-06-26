@@ -5,6 +5,9 @@ import akka.actor.ActorRef;
 import akka.actor.AbstractActor;
 import scala.concurrent.duration.Duration;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.*;
 import java.io.Serializable;
 
@@ -49,6 +52,11 @@ class Chatter extends AbstractActor {
     public List<String> view;
 
     /*
+     * Number of current view
+     */
+    public int viewCounter;
+
+    /*
      * Random Number used to random multicast
      */
     public Random rnd = new Random();
@@ -76,6 +84,12 @@ class Chatter extends AbstractActor {
      *    ID of the current actor
      */
     public int id = 0;
+
+    /*
+     * Output to log
+     */
+
+    public String out = "";
 
     /*
      *   The local hashMap, in which we keep the last with the ActorRef and its own LastMessage
@@ -169,10 +183,12 @@ class Chatter extends AbstractActor {
     public static class NewView implements Serializable{
         public final List<ActorRef> group;    // an array of group members
         public final List<String> view;
-        public NewView(List<ActorRef> group, List<String> view) {
+        public final int viewCounter;
+        public NewView(List<ActorRef> group, List<String> view, int viewCounter) {
             // Copying the group as an unmodifiable list
             this.group = new ArrayList<ActorRef>(group);
             this.view = new ArrayList<String>(view);
+            this.viewCounter = viewCounter;
         }
     }
 
@@ -287,6 +303,8 @@ class Chatter extends AbstractActor {
     public void sendChatMsg() {
         this.sendCount++;
         ChatMsg m = new ChatMsg(this.id,"[~" + numberToString((int) (Math.random()*1000000)%99999) + "]");
+        out = this.id + " send multicast " + m.text + " within " + this.viewCounter + "\n";
+        MulticastLog(out);
         System.err.print( "Message in multicast -> id:" + this.id + ", text: " + m.text +"\n");
         multicast(m);
         appendToHistory(m); // append the sent message
@@ -318,6 +336,8 @@ class Chatter extends AbstractActor {
     public void deliver(ChatMsg m) {
 
         appendToHistory(m);
+        out = this.id + " deliver multicast " + m.text + " from "  + m.senderId + " within " + this.viewCounter + "\n";
+        MulticastLog(out);
         System.out.println("\u001B[35m" + "Message \"" + m.text + "\" from " + m.senderId + " deliver to Node: " + this.id);
 
     }
@@ -346,4 +366,47 @@ class Chatter extends AbstractActor {
     public String getCharForNumber(int i) {
         return i > 0 && i < 27 ? String.valueOf((char)(i + 64)) : null;
     }
+
+    //creates log file
+    public void MulticastLog(String text) {
+
+        String FILENAME = "multicast-log.txt";
+
+        BufferedWriter bw = null;
+        FileWriter fw = null;
+
+        try {
+
+            // String content = "This is the content to write into file\n";
+
+            fw = new FileWriter(FILENAME, true);
+            bw = new BufferedWriter(fw);
+            bw.write(text);
+
+            //System.out.println("Done");
+
+        } catch (IOException e) {
+
+            e.printStackTrace();
+
+        } finally {
+
+            try {
+
+                if (bw != null)
+                    bw.close();
+
+                if (fw != null)
+                    fw.close();
+
+            } catch (IOException ex) {
+
+                ex.printStackTrace();
+
+            }
+
+        }
+
+    }
+
 }
