@@ -76,8 +76,9 @@ public class NodePartecipant extends Chatter {
         //need to check if old view messages are delivered
         //need to check all FLUSH messages are received by all
         this.group = newView.group;
+        this.view = newView.view;
         System.out.println( "\u001B[33" +
-                "m" + "Node " + getSelf().path().name() + " Install a new View: "); //add list of node inside view
+                "m" + "Node " + getSelf().path().name() + " Install a new View: " + this.view.toString()); //add list of node inside view
 
     }
 

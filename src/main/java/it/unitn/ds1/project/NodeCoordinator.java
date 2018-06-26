@@ -85,6 +85,10 @@ public class NodeCoordinator extends Chatter {
          * Send the new id to the new node
          */
         getSender().tell(new NewId(++idCounter), getSelf());
+
+        /*
+         * Add new node to the view
+         */
         this.view.add(getSender().path().name());
 
         /*
@@ -92,7 +96,7 @@ public class NodeCoordinator extends Chatter {
          */
         System.out.println("\u001B[34m" + getSelf().path().name() + " sending new view with " + this.view.toString());
         this.group.add(getSender());
-        this.multicast(new NewView(this.group));
+        this.multicast(new NewView(this.group, this.view));
 
         /*
          * Finally I can send the ok for enter to the requester

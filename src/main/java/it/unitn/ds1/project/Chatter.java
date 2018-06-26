@@ -44,6 +44,11 @@ class Chatter extends AbstractActor {
     public List<ActorRef> group;
 
     /*
+     * The list of peers names (the multicast group)
+     */
+    public List<String> view;
+
+    /*
      * Random Number used to random multicast
      */
     public Random rnd = new Random();
@@ -163,9 +168,11 @@ class Chatter extends AbstractActor {
      */
     public static class NewView implements Serializable{
         public final List<ActorRef> group;    // an array of group members
-        public NewView(List<ActorRef> group) {
+        public final List<String> view;
+        public NewView(List<ActorRef> group, List<String> view) {
             // Copying the group as an unmodifiable list
             this.group = new ArrayList<ActorRef>(group);
+            this.view = new ArrayList<String>(view);
         }
     }
 
