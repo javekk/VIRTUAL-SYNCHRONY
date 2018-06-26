@@ -179,6 +179,17 @@ public class NodeCoordinator extends Chatter {
          */
         if(!crashedPeers.isEmpty()){
             System.out.println("OMG!!! Someone is crashed!!11!! INDIGNAZIONE!!!  ___loro?->" + this.fromWhomTheMessagesArrived.toString());
+            /*
+             * SOLUZIONE TEMPORANEA LI TOLGO E BOM
+             */
+             for(ActorRef a :crashedPeers){
+                this.fromWhomTheMessagesArrived.remove(a);
+                this.group.remove(a);
+                for(int i = 0; i < view.size(); i++){
+                    if(view.get(i).equals(a.path().name())) view.remove(i);
+                }
+             }
+            this.multicast(new NewView(this.group, this.view));
         }
 
 

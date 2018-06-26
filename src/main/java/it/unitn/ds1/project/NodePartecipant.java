@@ -148,8 +148,18 @@ public class NodePartecipant extends Chatter {
 
     // emulate a crash and a recovery in a given time
     public void onCrash(Crash c) throws InterruptedException {
-        crashed = true;
+        this.crashed = true;
         System.out.println("CRASH!!!!!!!" + getSelf().path().name());
+
+        /*
+         * I try to rejoin after a while
+         */
+        getContext().system().scheduler().scheduleOnce(
+                Duration.create(c.delay, TimeUnit.SECONDS),
+                this.group.get(0),
+                new JoinRequest(), // the message to send
+                getContext().system().dispatcher(), getSelf()
+        );
 
     }
 }
