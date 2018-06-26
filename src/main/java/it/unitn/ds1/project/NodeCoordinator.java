@@ -138,7 +138,8 @@ public class NodeCoordinator extends Chatter {
         /*
          * Send the new id to the new node
          */
-        getSender().tell(new NewId(++idCounter), getSelf());
+        int id = group.size() == 0 ? 0 : group.size();
+        getSender().tell(new NewId(id), getSelf());
 
         /*
          * Add new node to the view
