@@ -351,7 +351,7 @@ class Chatter extends AbstractActor {
     //creates log file
     public void MulticastLog(String text) {
 
-        String FILENAME = "multicast-log.txt";
+        String FILENAME = "multicast.log";
 
         BufferedWriter bw = null;
         FileWriter fw = null;

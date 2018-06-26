@@ -156,7 +156,7 @@ public class NodePartecipant extends Chatter {
     //creates log file
     public void ParticipantLog(String text) {
 
-        String FILENAME = "participant-log.txt";
+        String FILENAME = "participant.log";
 
         BufferedWriter bw = null;
         FileWriter fw = null;

@@ -205,7 +205,7 @@ public class NodeCoordinator extends Chatter {
                 }
              }
 
-             viewCounter++;
+                 viewCounter++;
              this.multicast(new NewView(this.group, this.view, this.viewCounter));
         }
 
