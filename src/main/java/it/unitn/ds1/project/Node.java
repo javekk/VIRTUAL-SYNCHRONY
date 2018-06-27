@@ -35,12 +35,6 @@ class Node extends AbstractActor {
      //       | |_| | |  __/ | | | | |  __/ | |    | (_| | | |
      //        \____|  \___| |_| |_|  \___| |_|     \__,_| |_|
 
-
-    /*
-     * Limit of the messages for the node
-     */
-    public final static int N_MESSAGES = 5;
-
     /*
      * The list of peers (the multicast group)
      */
@@ -104,6 +98,16 @@ class Node extends AbstractActor {
     public  boolean crashed = false;
 
 
+    /*
+     * Am I Unstable?
+     */
+    public  boolean unstable = false;
+
+
+    /*
+     * HashMap that track the FLush messages for each view
+     */
+    public List<ActorRef> flushMessagesTracker = new ArrayList<>();
 
     //         __  __                   _____                                             ____   _
     //        |  \/  |  ___    __ _    |_   _|  _   _   _ __     ___   ___               / ___| | |   __ _   ___   ___    ___   ___
@@ -219,6 +223,31 @@ class Node extends AbstractActor {
         }
     }
 
+
+    /*
+     * #9
+     * Unstable Message
+     */
+    public static class Unstable implements Serializable{
+        public final NewView view;
+        public Unstable(NewView view ){
+            this.view = view;
+        }
+    }
+
+
+    /*
+     * #10
+     * Stable Message
+     */
+    public static class Flush implements Serializable{
+        public final NewView view;
+        public Flush(NewView view ){
+            this.view = view;
+        }
+    }
+
+
     //             _             _                                ____           _
      //            / \      ___  | |_    ___    _ __              | __ )    ___  | |__     __ _  __   __
      //           / _ \    / __| | __|  / _ \  | '__|    _____    |  _ \   / _ \ | '_ \   / _` | \ \ / /
@@ -247,8 +276,8 @@ class Node extends AbstractActor {
      */
     public void onStartChatMsg(StartChatMsg msg) {
         getContext().system().scheduler().schedule(
-                Duration.create((int)(7000*Math.random()), TimeUnit.MILLISECONDS),
-                Duration.create((int)(7000*Math.random()), TimeUnit.MILLISECONDS),
+                Duration.create((int)(5000*Math.random()), TimeUnit.MILLISECONDS),
+                Duration.create((int)(5000*Math.random())+1000, TimeUnit.MILLISECONDS),
                 () -> sendChatMsg(),
                 getContext().system().dispatcher());
 
@@ -261,6 +290,43 @@ class Node extends AbstractActor {
      */
     public void printHistory(PrintHistoryMsg msg) {
         System.out.printf("%02d: %s\n", this.id, this.chatHistory);
+    }
+
+
+    /*
+     * #9
+     * Unstable Message
+     */
+    public void onUnstable(Unstable unstable){
+        this.unstable = true;
+    }
+
+
+    /*
+     * #10
+     * On stable messages
+     * Could be arrived more than one new view
+     */
+    public void onFlush(Flush flush){
+
+        if(flush.view.viewCounter > this.viewCounter){
+            this.group = flush.view.group;
+            this.view = flush.view.view;
+            this.viewCounter = flush.view.viewCounter;
+            this.flushMessagesTracker.removeAll(this.flushMessagesTracker);
+        }
+
+        this.flushMessagesTracker.add(getSender());
+
+        // Coordinator is stable & one peer doesn't send the stable to itself
+        int diffT = this.id == 0 ? 1 : 2;
+        if((this.flushMessagesTracker.size()+diffT) == this.group.size()){
+            //stable
+            out = getSelf().path().name().substring(4) + " install view " + this.viewCounter + " " + this.view.toString() + "\n";
+            System.out.println("\u001B[33m" + "Node " + getSelf().path().name() + " INSTALL a new View: " + this.view.toString()); //add list of node inside view
+            this.unstable = false;
+            this.flushMessagesTracker.removeAll(this.flushMessagesTracker);
+        }
     }
 
 
@@ -281,7 +347,9 @@ class Node extends AbstractActor {
      * appentToHistory
      */
     public void sendChatMsg() {
-        if (crashed) return;
+
+        if (crashed || unstable) return;
+
         this.sendCount++;
         ChatMsg m = new ChatMsg(this.id,"[~" + numberToString((int) (Math.random()*1000000)%99999) + "]");
         out = this.id + " send multicast " + m.text + " within " + this.viewCounter + "\n";

@@ -83,6 +83,8 @@ public class NodeCoordinator extends Node {
                 .match(ChatMsg.class,         this::onChatMsg)         //#3
                 .match(PrintHistoryMsg.class, this::printHistory)      //#4
                 .match(JoinRequest.class,    this::onJoinRequest)      //#6
+                .match(Unstable.class,    this::onUnstable)      //#9
+                .match(Flush.class, this::onFlush) //#10
                 .build();
     }
 
@@ -143,6 +145,7 @@ public class NodeCoordinator extends Node {
 
 
         System.out.println("\u001B[34m" + getSender().path().name() + " asking for joining");
+        this.unstable = true;
         /*
          * Send the new id to the new node
          */

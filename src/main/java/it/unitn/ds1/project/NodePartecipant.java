@@ -1,6 +1,7 @@
 package it.unitn.ds1.project;
 
 
+import akka.actor.ActorRef;
 import akka.actor.Props;
 import scala.concurrent.duration.Duration;
 
@@ -8,6 +9,7 @@ import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 
 
@@ -63,13 +65,15 @@ public class NodePartecipant extends Node {
                 .match(NewView.class, this::onGetNewView)            //#5
                 .match(CanJoin.class, this::join)                    //#6
                 .match(NewId.class, this::onNewId)      //#8
-                .match(NewId.class,    this::onNewId)      //#8
-                .match(Crash.class,    this::onCrash)      //#8
+                .match(Crash.class,    this::onCrash)      //#p1
+                .match(Unstable.class,    this::onUnstable)      //#9
+                .match(Flush.class, this::onFlush) //#10
                 .build();
     }
 
 
     /*
+     * #p1
      * I wanna crash
      */
     public static class Crash implements Serializable {
@@ -114,19 +118,23 @@ public class NodePartecipant extends Node {
 
     /*
      * #5
-     * When I receive a new view, I install it, easy
+     * When I receive a new view,
+     * I am unstable
+     * Multicast Unstable
+     * Multicast Stable
      */
     public void onGetNewView(NewView newView) {
 
-        //need to check if old view messages are delivered
-        //need to check all FLUSH messages are received by all
+        this.unstable = true;
+
         this.group = newView.group;
         this.view = newView.view;
         this.viewCounter = newView.viewCounter;
-        out = getSelf().path().name().substring(4) + " install view " + this.viewCounter + " " + this.view.toString() + "\n";
-        ParticipantLog(out);
-        System.out.println("\u001B[33" +
-                "m" + "Node " + getSelf().path().name() + " Install a new View: " + this.view.toString()); //add list of node inside view
+
+        multicast(new Unstable(newView));
+        multicast(new Flush(newView));
+
+        System.out.println("\u001B[33m" + "Node " + getSelf().path().name() + ". New view Arrived: " + this.view.toString()); //add list of node inside view
 
     }
 
@@ -136,6 +144,7 @@ public class NodePartecipant extends Node {
      * Let's join the group and start multicasting
      */
     public void join(CanJoin cj) {
+        this.unstable = true;
         JoinGroupMsg join = new JoinGroupMsg(cj.group);
         this.getSelf().tell(join, null);
         this.getSelf().tell(new StartChatMsg(), getSelf());
@@ -150,6 +159,37 @@ public class NodePartecipant extends Node {
     public void onNewId(NewId newId) {
         this.id = newId.newId;
     }
+
+
+
+    /*
+     * #p1
+     * emulate a crash and a recovery in a given time
+     */
+    public void onCrash(Crash c) throws InterruptedException {
+        this.crashed = true;
+        System.out.println("CRASH!!!!!!!" + getSelf().path().name());
+
+        /*
+         * I try to rejoin after a while
+         */
+        getContext().system().scheduler().scheduleOnce(
+                Duration.create(c.delay, TimeUnit.SECONDS),
+                this.group.get(0),
+                new JoinRequest(), // the message to send
+                getContext().system().dispatcher(), getSelf()
+        );
+
+    }
+
+
+
+    //         _   _          _           _                     _____
+    //        | | | |   ___  | |  _ __   (_)  _ __     __ _    |  ___|  _   _   _ __     ___   ___
+    //        | |_| |  / _ \ | | | '_ \  | | | '_ \   / _` |   | |_    | | | | | '_ \   / __| / __|
+    //        |  _  | |  __/ | | | |_) | | | | | | | | (_| |   |  _|   | |_| | | | | | | (__  \__ \
+    //        |_| |_|  \___| |_| | .__/  |_| |_| |_|  \__, |   |_|      \__,_| |_| |_|  \___| |___/
+    //                           |_|                  |___/
 
 
     //creates log file
@@ -195,21 +235,4 @@ public class NodePartecipant extends Node {
     }
 
 
-
-    // emulate a crash and a recovery in a given time
-    public void onCrash(Crash c) throws InterruptedException {
-        this.crashed = true;
-        System.out.println("CRASH!!!!!!!" + getSelf().path().name());
-
-        /*
-         * I try to rejoin after a while
-         */
-        getContext().system().scheduler().scheduleOnce(
-                Duration.create(c.delay, TimeUnit.SECONDS),
-                this.group.get(0),
-                new JoinRequest(), // the message to send
-                getContext().system().dispatcher(), getSelf()
-        );
-
-    }
 }
