@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-public class NodeCoordinator extends Chatter {
+public class NodeCoordinator extends Node {
 
 
     //         _   _               _            ____
@@ -193,7 +193,8 @@ public class NodeCoordinator extends Chatter {
          * OMG! INDIGNAZIONE!!!!!
          */
         if(!crashedPeers.isEmpty()){
-            System.out.println("OMG!!! Someone is crashed!!11!! INDIGNAZIONE!!!  ___loro?->" + this.fromWhomTheMessagesArrived.toString());
+
+            System.out.println("OMG!!! Someone is crashed!!11!! INDIGNAZIONE!!!  ___look who's crashed->" + this.fromWhomTheMessagesArrived.toString());
             /*
              * SOLUZIONE TEMPORANEA LI TOLGO E BOM
              */
@@ -205,7 +206,7 @@ public class NodeCoordinator extends Chatter {
                 }
              }
 
-                 viewCounter++;
+             viewCounter++;
              this.multicast(new NewView(this.group, this.view, this.viewCounter));
         }
 

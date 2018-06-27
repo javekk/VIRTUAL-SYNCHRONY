@@ -1,7 +1,6 @@
 package it.unitn.ds1.project;
 
 
-import akka.actor.ActorRef;
 import akka.actor.Props;
 import scala.concurrent.duration.Duration;
 
@@ -12,7 +11,7 @@ import java.io.Serializable;
 import java.util.concurrent.TimeUnit;
 
 
-public class NodePartecipant extends Chatter {
+public class NodePartecipant extends Node {
 
     //         _   _               _            ____
     //        | \ | |   ___     __| |   ___    |  _ \   _ __    ___    _ __    ___
