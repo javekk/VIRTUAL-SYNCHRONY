@@ -125,6 +125,10 @@ public class NodePartecipant extends Node {
      */
     public void onGetNewView(NewView newView) {
 
+        //WHY Can I receive view that happens before the current view? isn't it fifo? -> yes, but
+        //I can receive the FLUSH message with the new view before the view itself
+        if(newView.viewCounter < this.viewCounter) return;
+
         this.unstable = true;
 
         this.group = newView.group;

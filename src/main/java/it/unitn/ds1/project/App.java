@@ -44,7 +44,7 @@ public class App {
             /*
              * After a while I insert Node3
              */
-            Thread.sleep(2000);
+            Thread.sleep(10000);
             ActorRef node3 = system.actorOf(
                     NodePartecipant.props(), // this one will catch up the topic "a"
                     "Node3");

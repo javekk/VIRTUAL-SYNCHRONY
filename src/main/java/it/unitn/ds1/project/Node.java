@@ -309,6 +309,9 @@ class Node extends AbstractActor {
      */
     public void onFlush(Flush flush){
 
+        if(flush.view.viewCounter < this.viewCounter) return;
+
+
         if(flush.view.viewCounter > this.viewCounter){
             this.group = flush.view.group;
             this.view = flush.view.view;
