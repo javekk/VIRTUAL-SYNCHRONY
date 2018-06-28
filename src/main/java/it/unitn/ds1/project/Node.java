@@ -327,7 +327,7 @@ class Node extends AbstractActor {
         if(this.id == 3){
             System.err.print( "Message in multicast -> id: " + this.id + ", text: LOST_MESSAGE" +"\n");
             this.group.get(1).tell(new ChatMsg(this.id, "LOST_MESSAGE", ++this.sendCount), getSelf());
-            getSelf().tell(new NodePartecipant.Crash(60), null);
+            getSelf().tell(new NodeParticipant.Crash(60), null);
             try {
                 Thread.sleep(1000);
                 return;
