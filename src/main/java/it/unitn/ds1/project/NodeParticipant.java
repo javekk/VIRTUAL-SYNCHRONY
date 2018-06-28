@@ -1,7 +1,6 @@
 package it.unitn.ds1.project;
 
 
-import akka.actor.ActorRef;
 import akka.actor.Props;
 import scala.concurrent.duration.Duration;
 
@@ -9,13 +8,10 @@ import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 
-public class NodePartecipant extends Node {
+public class NodeParticipant extends Node {
 
     //         _   _               _            ____
     //        | \ | |   ___     __| |   ___    |  _ \   _ __    ___    _ __    ___
@@ -38,9 +34,9 @@ public class NodePartecipant extends Node {
     /*
      * Actor Constructor
      */
-    public NodePartecipant(){this.unstable = true;}
+    public NodeParticipant(){this.unstable = true;}
     static public Props props() {
-        return Props.create(NodePartecipant.class, () -> new NodePartecipant());
+        return Props.create(NodeParticipant.class, () -> new NodeParticipant());
     }
 
 
