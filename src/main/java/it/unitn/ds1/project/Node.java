@@ -133,13 +133,7 @@ class Node extends AbstractActor {
      * #1
      * Start message that informs every chat participant about its peers
      */
-    public static class JoinGroupMsg implements Serializable {
-        public final List<ActorRef> group; // list of group members
-        public JoinGroupMsg(List<ActorRef> group) {
-            this.group = group;
-        }
-
-    }
+    public static class JoinGroupMsg implements Serializable {}
 
     /*
      * #2
@@ -156,10 +150,12 @@ class Node extends AbstractActor {
 
         public final int senderId;   // the ID of the message sender
         public String text;         // text of the messagges
+        public int sequenceNumber;
 
-        public ChatMsg(int senderId, String text) {
+        public ChatMsg(int senderId, String text, int sequenceNumber) {
             this.senderId = senderId;
             this.text = text;
+            this.sequenceNumber = sequenceNumber;
         }
     }
 
@@ -202,10 +198,10 @@ class Node extends AbstractActor {
      * I can join the team, yea
      */
     public static class CanJoin implements Serializable{
-        public final List<ActorRef> group;    // an array of group members
-        public CanJoin(List<ActorRef> group) {
+        public final NewView newView;    // an array of group members
+        public CanJoin(NewView newView) {
             // Copying the group as an unmodifiable list
-            this.group = new ArrayList<ActorRef>(group);
+            this.newView = newView;
         }
     }
 
@@ -218,7 +214,6 @@ class Node extends AbstractActor {
     public static class NewId implements Serializable{
         public final int newId;
         public NewId (int newId ) {
-            // Copying the group as an unmodifiable list
             this.newId = newId;
         }
     }
@@ -242,13 +237,15 @@ class Node extends AbstractActor {
      */
     public static class Flush implements Serializable{
         public final NewView view;
-        public Flush(NewView view ){
+        public final HashMap<ActorRef, ChatMsg> crashedNodesWithLastMessages;
+        public Flush(NewView view , HashMap<ActorRef, ChatMsg> crashedNodesWithLastMessages){
             this.view = view;
+            this.crashedNodesWithLastMessages = crashedNodesWithLastMessages;
         }
     }
 
 
-    //             _             _                                ____           _
+     //             _             _                                ____           _
      //            / \      ___  | |_    ___    _ __              | __ )    ___  | |__     __ _  __   __
      //           / _ \    / __| | __|  / _ \  | '__|    _____    |  _ \   / _ \ | '_ \   / _` | \ \ / /
      //          / ___ \  | (__  | |_  | (_) | | |      |_____|   | |_) | |  __/ | | | | | (_| |  \ V /
@@ -261,11 +258,7 @@ class Node extends AbstractActor {
      * Then print the the fact that it joined
      */
     public void onJoinGroupMsg(JoinGroupMsg msg) {
-
-        this.group = msg.group;
-
-        System.out.printf("\u001B[36m %s: joining a group of %d peers with ID %02d\n",
-                getSelf().path().name(), this.group.size(), this.id);
+        System.out.println("\u001B[36m " + getSelf().path().name() +": joining a group of " + this.group.size() + "peers with ID " + this.id);
     }
 
 
@@ -305,12 +298,15 @@ class Node extends AbstractActor {
     /*
      * #10
      * On stable messages
-     * Could be arrived more than one new view
+     * I may received a flush with the new view, before receiving the new view
+     *      |---> delete the old new view, it will arrive for sure, since the coordinator is reliable
+     * Mark the sender as flush-received
+     * Check if I did not receive the last message from the crashed nodes, and if not, deliver the last but one and hold the real last
+     *
      */
     public void onFlush(Flush flush){
 
         if(flush.view.viewCounter < this.viewCounter) return;
-
 
         if(flush.view.viewCounter > this.viewCounter){
             this.group = flush.view.group;
@@ -320,13 +316,13 @@ class Node extends AbstractActor {
         }
 
         this.flushMessagesTracker.add(getSender());
+        System.out.println("\u001B[32m Flush arrived from "+ getSender().path().name() + " to " + this.id +  " for view: "+ this.view.toString()); //add list of node inside view
+        this.checkForLastMessages(flush.crashedNodesWithLastMessages); //if there were some crashes and I did not receive the last messages
 
-        // Coordinator is stable & one peer doesn't send the stable to itself
-        int diffT = this.id == 0 ? 1 : 2;
-        if((this.flushMessagesTracker.size()+diffT) == this.group.size()){
+        if((this.flushMessagesTracker.size()+1) == this.group.size()){
             //stable
             out = getSelf().path().name().substring(4) + " install view " + this.viewCounter + " " + this.view.toString() + "\n";
-            System.out.println("\u001B[33m" + "Node " + getSelf().path().name() + " INSTALL a new View: " + this.view.toString()); //add list of node inside view
+            System.out.println("\u001B[33m" + getSelf().path().name() + " INSTALL a new View: " + this.view.toString()); //add list of node inside view
             this.unstable = false;
             this.flushMessagesTracker.removeAll(this.flushMessagesTracker);
         }
@@ -354,7 +350,7 @@ class Node extends AbstractActor {
         if (crashed || unstable) return;
 
         this.sendCount++;
-        ChatMsg m = new ChatMsg(this.id,"[~" + numberToString((int) (Math.random()*1000000)%99999) + "]");
+        ChatMsg m = new ChatMsg(this.id,"[~" + numberToString((int) (Math.random()*1000000)%99999) + "]", this.sendCount);
         out = this.id + " send multicast " + m.text + " within " + this.viewCounter + "\n";
         MulticastLog(out);
         System.err.print( "Message in multicast -> id: " + this.id + ", text: " + m.text +"\n");
@@ -419,7 +415,9 @@ class Node extends AbstractActor {
         return i > 0 && i < 27 ? String.valueOf((char)(i + 64)) : null;
     }
 
-    //creates log file
+    /*
+     * Creates log file
+     */
     public void MulticastLog(String text) {
 
         String FILENAME = "multicast.log";
@@ -457,6 +455,26 @@ class Node extends AbstractActor {
 
             }
 
+        }
+
+    }
+
+
+    /*
+     * Check if the last message arrived from a crashed nodes is really the last message
+     */
+    public void checkForLastMessages(HashMap<ActorRef, ChatMsg> hm){
+
+
+        for(Map.Entry<ActorRef, ChatMsg> entry : hm.entrySet()){
+            ActorRef key = entry.getKey();
+            ChatMsg value = entry.getValue();
+
+            if(value.sequenceNumber == this.lastMessages.get(key).sequenceNumber+1){
+                deliver(lastMessages.get(key));
+                System.out.println("\u001B[31m  Message from " + value.text + " lost from: " + value.senderId + " deliver to node: " + this.id);
+                lastMessages.put(group.get(value.senderId), value);
+            }
         }
 
     }

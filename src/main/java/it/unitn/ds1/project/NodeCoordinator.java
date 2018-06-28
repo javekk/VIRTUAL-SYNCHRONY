@@ -127,14 +127,12 @@ public class NodeCoordinator extends Node {
         ChatMsg drop;
         if (lastMessages.get(group.get(msg.senderId)) != null) {
             drop = lastMessages.get(group.get(msg.senderId));
-            System.out.println("\u001B[32m" + "Message \"" + drop.text + "\" " + "from Node: " + msg.senderId + " dropped by Node: " + this.id);
-
+            deliver(drop);
         }
         lastMessages.put(group.get(msg.senderId), msg);
         this.fromWhomTheMessagesArrived.replace(getSender(), true);
-        deliver(msg);
-    }
 
+    }
 
 
     /*
@@ -165,22 +163,24 @@ public class NodeCoordinator extends Node {
         /*
          * I send to anybody the new view with the new peer
          */
-        System.out.println("\u001B[34m" + getSelf().path().name() + " sending new view with " + this.view.toString());
         this.group.add(getSender());
         this.fromWhomTheMessagesArrived.put(getSender(), true);
-        this.multicast(new NewView(this.group, this.view, this.viewCounter));
-
+        NewView newView = new NewView(this.group, this.view, this.viewCounter);
+        System.out.println("\u001B[34m" + getSelf().path().name() + " sending new view with " + this.view.toString());
 
         /*
          * Finally I can send the ok for enter to the requester
          */
-
-        getSender().tell(new CanJoin(this.group), getSelf());
+        getSender().tell(new CanJoin(newView), getSelf());
+        this.multicast(newView);
+        this.multicast(new Flush(newView, new HashMap<>()));
 
     }
 
 
     private void crashDetector(){
+
+        if(this.unstable) return;
 
         /*
          * If I find some false values, means that no messages arrived from that peers
@@ -197,9 +197,9 @@ public class NodeCoordinator extends Node {
          */
         if(!crashedPeers.isEmpty()){
 
-            System.out.println("OMG!!! Someone is crashed!!11!! INDIGNAZIONE!!!  ___look who's crashed->" + this.fromWhomTheMessagesArrived.toString());
+            System.out.println("OMG!!! Someone is crashed! ___look who's crashed->" + this.fromWhomTheMessagesArrived.toString());
             /*
-             * SOLUZIONE TEMPORANEA LI TOLGO E BOM
+             *
              */
              for(ActorRef a :crashedPeers){
                 this.fromWhomTheMessagesArrived.remove(a);
@@ -209,8 +209,12 @@ public class NodeCoordinator extends Node {
                 }
              }
 
-             viewCounter++;
-             this.multicast(new NewView(this.group, this.view, this.viewCounter));
+             this.viewCounter++;
+
+             NewView newView = new NewView(this.group, this.view, this.viewCounter);
+             this.multicast(newView);
+             multicast(new Flush(newView, this.checkForCrashedNodesMessagesCoordinator(crashedPeers)));
+
         }
 
 
@@ -221,6 +225,19 @@ public class NodeCoordinator extends Node {
             ActorRef key = entry.getKey();
             this.fromWhomTheMessagesArrived.replace(key, false);
         }
+
+    }
+
+
+    public HashMap<ActorRef, ChatMsg> checkForCrashedNodesMessagesCoordinator(List<ActorRef> crashedNodes){
+
+        HashMap<ActorRef, ChatMsg> ret = new HashMap<>();
+
+        for(ActorRef a : crashedNodes){
+            ret.put(a, this.lastMessages.get(a));
+        }
+
+        return ret;
 
     }
 

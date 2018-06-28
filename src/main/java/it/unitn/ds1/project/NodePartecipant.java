@@ -10,6 +10,8 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 
@@ -36,7 +38,7 @@ public class NodePartecipant extends Node {
     /*
      * Actor Constructor
      */
-
+    public NodePartecipant(){this.unstable = true;}
     static public Props props() {
         return Props.create(NodePartecipant.class, () -> new NodePartecipant());
     }
@@ -102,18 +104,16 @@ public class NodePartecipant extends Node {
 
         if(crashed) return;
 
+        System.out.println("\u001B[32m" + "Message \"" + msg.text + "\" " + "from Node: " + msg.senderId + " arrived to: " + this.id);
+
         ChatMsg drop;
         if (lastMessages.get(group.get(msg.senderId)) != null) {
             drop = lastMessages.get(group.get(msg.senderId));
-            System.out.println("\u001B[32m" + "Message \"" + drop.text + "\" " + "from Node: " + msg.senderId + " dropped by Node: " + this.id);
+            deliver(drop);
 
         }
         lastMessages.put(group.get(msg.senderId), msg);
-        deliver(msg);
     }
-
-
-
 
 
     /*
@@ -121,24 +121,25 @@ public class NodePartecipant extends Node {
      * When I receive a new view,
      * I am unstable
      * Multicast Unstable
-     * Multicast Stable
+     * Multicast Flush, with my last messages for the crashed nodes
      */
     public void onGetNewView(NewView newView) {
 
-        //WHY Can I receive view that happens before the current view? isn't it fifo? -> yes, but
-        //I can receive the FLUSH message with the new view before the view itself
         if(newView.viewCounter < this.viewCounter) return;
 
+        System.out.println("\u001B[33m" + "Node " + getSelf().path().name() + ". New view Arrived: " + newView.view.toString()); //add list of node inside view
+
         this.unstable = true;
+
+        //Check for the crashed-peers' messages
+        HashMap<ActorRef, ChatMsg> t = this.checkForCrashedNodesMessages(newView);
 
         this.group = newView.group;
         this.view = newView.view;
         this.viewCounter = newView.viewCounter;
 
         multicast(new Unstable(newView));
-        multicast(new Flush(newView));
-
-        System.out.println("\u001B[33m" + "Node " + getSelf().path().name() + ". New view Arrived: " + this.view.toString()); //add list of node inside view
+        multicast(new Flush(newView, t));
 
     }
 
@@ -148,9 +149,12 @@ public class NodePartecipant extends Node {
      * Let's join the group and start multicasting
      */
     public void join(CanJoin cj) {
-        this.unstable = true;
-        JoinGroupMsg join = new JoinGroupMsg(cj.group);
-        this.getSelf().tell(join, null);
+        if(cj.newView.viewCounter > this.viewCounter){
+            this.group = cj.newView.group;
+            this.view = cj.newView.view;
+            this.viewCounter = cj.newView.viewCounter;
+        }
+        this.getSelf().tell(new JoinGroupMsg(), null);
         this.getSelf().tell(new StartChatMsg(), getSelf());
         this.crashed = false;
     }
@@ -239,4 +243,24 @@ public class NodePartecipant extends Node {
     }
 
 
+    /*
+     * Map each crashed node with the last message arrived in this node
+     */
+    public HashMap<ActorRef, ChatMsg> checkForCrashedNodesMessages(NewView newView) {
+
+        HashMap<ActorRef, ChatMsg> ret = new HashMap<>();
+
+        if (this.group != null && this.group.size() > newView.group.size()) {
+
+            List<ActorRef> CrashedPeers = new ArrayList<>(newView.group);
+            CrashedPeers.removeIf(item -> this.group.contains(item));
+            for (ActorRef a : CrashedPeers) {
+                ret.put(a, this.lastMessages.get(a));
+                System.out.print("......)");
+            }
+
+        }
+        return ret;
+
+    }
 }
