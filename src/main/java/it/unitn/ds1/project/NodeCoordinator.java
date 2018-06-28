@@ -178,6 +178,35 @@ public class NodeCoordinator extends Node {
     }
 
 
+    /*
+     * #10
+     * On stable messages
+     * I may received a flush with the new view, before receiving the new view
+     *      |---> delete the old new view, it will arrive for sure, since the coordinator is reliable
+     * Mark the sender as flush-received
+     * Check if I did not receive the last message from the crashed nodes, and if not, deliver the last but one and hold the real last
+     *
+     */
+    public void onFlush(Flush flush){
+
+        if(flush.view.viewCounter < this.viewCounter) return;
+
+        this.flushMessagesTracker.add(getSender());
+        System.out.println("\u001B[32m Flush arrived from "+ getSender().path().name() + " to " + this.id +  " for view: "+ this.view.toString()); //add list of node inside view
+        this.checkForLastMessages(flush.crashedNodesWithLastMessages); //if there were some crashes and I did not receive the last messages
+
+        if((this.flushMessagesTracker.size()+1) == this.group.size()){
+            //stable
+            out = getSelf().path().name().substring(4) + " install view " + this.viewCounter + " " + this.view.toString() + "\n";
+            System.out.println("\u001B[33m" + getSelf().path().name() + " INSTALL a new View: " + this.view.toString()); //add list of node inside view
+            this.unstable = false;
+            this.flushMessagesTracker.removeAll(this.flushMessagesTracker);
+        }
+    }
+
+
+
+
     private void crashDetector(){
 
         if(this.unstable) return;
@@ -233,10 +262,12 @@ public class NodeCoordinator extends Node {
 
         HashMap<ActorRef, ChatMsg> ret = new HashMap<>();
 
+        String s = getSelf().path().name() + "->";
         for(ActorRef a : crashedNodes){
             ret.put(a, this.lastMessages.get(a));
+            if(this.lastMessages.get(a)!=null)s = s.concat("[" + a.path().name() + ";" + this.lastMessages.get(a).text + "]");
         }
-
+        System.out.println(s);
         return ret;
 
     }
