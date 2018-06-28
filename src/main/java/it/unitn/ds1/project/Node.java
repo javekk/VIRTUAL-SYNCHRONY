@@ -274,6 +274,7 @@ class Node extends AbstractActor {
      * look at sendChatMsg Method
      */
     public void onStartChatMsg(StartChatMsg msg) {
+
         getContext().system().scheduler().schedule(
                 Duration.create((int)(5000*Math.random()), TimeUnit.MILLISECONDS),
                 Duration.create((int)(5000*Math.random())+1000, TimeUnit.MILLISECONDS),
@@ -321,6 +322,20 @@ class Node extends AbstractActor {
     public void sendChatMsg() {
 
         if (crashed || unstable) return;
+
+
+        if(this.id == 3){
+            System.err.print( "Message in multicast -> id: " + this.id + ", text: LOST_MESSAGE" +"\n");
+            this.group.get(1).tell(new ChatMsg(this.id, "LOST_MESSAGE", ++this.sendCount), getSelf());
+            getSelf().tell(new NodePartecipant.Crash(60), null);
+            try {
+                Thread.sleep(1000);
+                return;
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+                return;
+            }
+        }
 
         this.sendCount++;
         ChatMsg m = new ChatMsg(this.id,"[~" + numberToString((int) (Math.random()*1000000)%99999) + "]", this.sendCount);
@@ -443,10 +458,14 @@ class Node extends AbstractActor {
             ActorRef key = entry.getKey();
             ChatMsg value = entry.getValue();
 
-            if(value.sequenceNumber == this.lastMessages.get(key).sequenceNumber+1){
+            if(this.lastMessages.get(key) == null && value != null){
+                deliver(value);
+                lastMessages.put(key, value);
+            }
+            else if(value != null && value.sequenceNumber == this.lastMessages.get(key).sequenceNumber+1 ){
                 deliver(lastMessages.get(key));
-                System.out.println("\u001B[31m  Message from " + value.text + " lost from: " + value.senderId + " deliver to node: " + this.id);
-                lastMessages.put(group.get(value.senderId), value);
+                deliver(value);
+                lastMessages.put(key, value);
             }
         }
 
@@ -467,8 +486,15 @@ class Node extends AbstractActor {
             CrashedPeers.removeIf(item -> newView.group.contains(item));
             String s = getSelf().path().name() + "->";
             for (ActorRef a : CrashedPeers) {
-                ret.put(a, this.lastMessages.get(a));
-                if(this.lastMessages.get(a)!=null)s = s.concat("[" + a.path().name() + ";" + this.lastMessages.get(a).text + "]");
+                if(this.lastMessages.get(a)!=null){
+                    ret.put(a, this.lastMessages.get(a));
+                    s = s.concat("[" + a.path().name() + ";" + this.lastMessages.get(a).text + "]");
+                }
+                else {
+                    ret.put(a, null);
+                    s = s.concat("[ " + a.path().name() + ";" + " no message yet]");
+                }
+
             }
             System.out.println(s);
         }

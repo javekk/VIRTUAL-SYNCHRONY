@@ -264,8 +264,14 @@ public class NodeCoordinator extends Node {
 
         String s = getSelf().path().name() + "->";
         for(ActorRef a : crashedNodes){
-            ret.put(a, this.lastMessages.get(a));
-            if(this.lastMessages.get(a)!=null)s = s.concat("[" + a.path().name() + ";" + this.lastMessages.get(a).text + "]");
+            if(this.lastMessages.get(a)!=null){
+                ret.put(a, this.lastMessages.get(a));
+                s = s.concat("[" + a.path().name() + ";" + this.lastMessages.get(a).text + "]");
+            }
+            else {
+                ret.put(a, null);
+                s = s.concat("[ " + a.path().name() + ";" + " no message yet]");
+            }
         }
         System.out.println(s);
         return ret;

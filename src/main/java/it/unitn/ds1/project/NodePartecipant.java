@@ -127,8 +127,6 @@ public class NodePartecipant extends Node {
 
         if(newView.viewCounter < this.viewCounter) return;
 
-
-        if(this.group != null)System.err.println("FROM VIEW" + getSelf().path().name() + ":" + newView.group + "!!!!!" + this.group);
         System.out.println("\u001B[33m" + "Node " + getSelf().path().name() + ". New view Arrived: " + newView.view.toString()); //add list of node inside view
 
         this.unstable = true;
@@ -207,7 +205,6 @@ public class NodePartecipant extends Node {
         if(flush.view.viewCounter < this.viewCounter) return;
 
         if(flush.view.viewCounter > this.viewCounter){
-            if(this.group != null)System.err.println("FROM FLUS" + getSelf().path().name() + ":"+flush.view.group + "!!!!!" + this.group);
             this.crashedNodesAndTheirMessages = this.checkForCrashedNodesMessages(flush.view);
 
             this.group = flush.view.group;

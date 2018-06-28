@@ -54,12 +54,9 @@ public class App {
             /*
              * After a while I insert Node4
              */
-            Thread.sleep(6000);
-            ActorRef node4 = system.actorOf(
-                    NodePartecipant.props(), // this one will catch up the topic "a"
-                    "Node4");
-            node3.tell(new NodePartecipant.Crash(30), null);
-            group.add(node4);
+            Thread.sleep(1000000);
+            node3.tell(new NodePartecipant.Crash(60), null); //crash and recover in 60 sec
+
 
 
             System.in.read();
