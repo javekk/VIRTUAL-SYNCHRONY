@@ -2,8 +2,11 @@ package it.unitn.ds1.project;
 
 import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
-import java.util.List;
+import com.typesafe.config.Config;
+import com.typesafe.config.ConfigFactory;
+
 import java.util.ArrayList;
+import java.util.List;
 
 public class App {
 
@@ -24,12 +27,12 @@ public class App {
         group.add(coordinator);
 
         ActorRef node1 = system.actorOf(
-                NodePartecipant.props(),
+                NodeParticipant.props(),
                 "Node1");
         group.add(node1);
 
         ActorRef node2 = system.actorOf(
-                NodePartecipant.props(),
+                NodeParticipant.props(),
                 "Node2");
         group.add(node2);
 
@@ -46,7 +49,7 @@ public class App {
              */
             Thread.sleep(10000);
             ActorRef node3 = system.actorOf(
-                    NodePartecipant.props(), // this one will catch up the topic "a"
+                    NodeParticipant.props(), // this one will catch up the topic "a"
                     "Node3");
             coordinator.tell(new Node.JoinRequest(), node3);
             group.add(node3);
@@ -56,9 +59,9 @@ public class App {
              */
             Thread.sleep(6000);
             ActorRef node4 = system.actorOf(
-                    NodePartecipant.props(), // this one will catch up the topic "a"
+                    NodeParticipant.props(), // this one will catch up the topic "a"
                     "Node4");
-            node3.tell(new NodePartecipant.Crash(30), null);
+            node3.tell(new NodeParticipant.Crash(30), null);
             group.add(node4);
 
 
@@ -69,5 +72,6 @@ public class App {
         catch (Exception ioe) {}
         system.terminate();
     }
+
 }
 
