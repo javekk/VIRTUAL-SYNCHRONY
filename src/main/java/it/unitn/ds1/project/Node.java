@@ -459,13 +459,11 @@ class Node extends AbstractActor {
             ChatMsg value = entry.getValue();
 
             if(this.lastMessages.get(key) == null && value != null){
-                deliver(value);
                 lastMessages.put(key, value);
             }
             else if(value != null && value.sequenceNumber == this.lastMessages.get(key).sequenceNumber+1 ){
-                deliver(lastMessages.get(key));
-                deliver(value);
-                lastMessages.put(key, value);
+                    deliver(lastMessages.get(key));
+                    lastMessages.put(key, value);
             }
         }
 
@@ -500,6 +498,16 @@ class Node extends AbstractActor {
         }
         return ret;
 
+    }
+
+
+    public void deliverInTheEndAfterCrash(Map<ActorRef,ChatMsg> hm){
+
+        for(Map.Entry<ActorRef, ChatMsg> entry : hm.entrySet()){
+            ActorRef key = entry.getKey();
+            ChatMsg value = entry.getValue();
+            if(value != null) deliver(lastMessages.get(key));
+        }
     }
 
 }

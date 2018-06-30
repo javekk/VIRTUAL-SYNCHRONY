@@ -125,11 +125,11 @@ public class NodeCoordinator extends Node {
     public void onChatMsg(ChatMsg msg) {
 
         ChatMsg drop;
-        if (lastMessages.get(group.get(msg.senderId)) != null) {
-            drop = lastMessages.get(group.get(msg.senderId));
+        if (lastMessages.get(getSender()) != null) {
+            drop = lastMessages.get(getSender());
             deliver(drop);
         }
-        lastMessages.put(group.get(msg.senderId), msg);
+        lastMessages.put(getSender(), msg);
         this.fromWhomTheMessagesArrived.replace(getSender(), true);
 
     }
@@ -201,6 +201,7 @@ public class NodeCoordinator extends Node {
             System.out.println("\u001B[33m" + getSelf().path().name() + " INSTALL a new View: " + this.view.toString()); //add list of node inside view
             this.unstable = false;
             this.flushMessagesTracker.removeAll(this.flushMessagesTracker);
+            this.deliverInTheEndAfterCrash(flush.crashedNodesWithLastMessages);
         }
     }
 

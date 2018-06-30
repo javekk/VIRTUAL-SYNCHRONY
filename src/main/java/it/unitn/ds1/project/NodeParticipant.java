@@ -82,12 +82,12 @@ public class NodeParticipant extends Node {
 
     }
 
+
     //             _             _                                ____           _
     //            / \      ___  | |_    ___    _ __              | __ )    ___  | |__     __ _  __   __
     //           / _ \    / __| | __|  / _ \  | '__|    _____    |  _ \   / _ \ | '_ \   / _` | \ \ / /
     //          / ___ \  | (__  | |_  | (_) | | |      |_____|   | |_) | |  __/ | | | | | (_| |  \ V /
     //         /_/   \_\  \___|  \__|  \___/  |_|                |____/   \___| |_| |_|  \__,_|   \_/
-
 
     /*
      * #3
@@ -100,15 +100,14 @@ public class NodeParticipant extends Node {
 
         if(crashed) return;
 
-        System.out.println("\u001B[32m" + "Message \"" + msg.text + "\" " + "from Node: " + msg.senderId + " arrived to: " + this.id);
 
         ChatMsg drop;
-        if (lastMessages.get(group.get(msg.senderId)) != null) {
-            drop = lastMessages.get(group.get(msg.senderId));
+        if (lastMessages.get(getSender()) != null) {
+            drop = lastMessages.get(getSender());
             deliver(drop);
 
         }
-        lastMessages.put(group.get(msg.senderId), msg);
+        lastMessages.put(getSender(), msg);
     }
 
 
@@ -217,6 +216,7 @@ public class NodeParticipant extends Node {
             //stable
             out = getSelf().path().name().substring(4) + " install view " + this.viewCounter + " " + this.view.toString() + "\n";
             System.out.println("\u001B[33m" + getSelf().path().name() + " INSTALL a new View: " + this.view.toString()); //add list of node inside view
+            this.deliverInTheEndAfterCrash(flush.crashedNodesWithLastMessages);
             this.unstable = false;
             this.flushMessagesTracker.removeAll(this.flushMessagesTracker);
         }

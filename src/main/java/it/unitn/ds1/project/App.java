@@ -39,7 +39,7 @@ public class App {
 
         coordinator.tell(new Node.JoinRequest(), node1);
         coordinator.tell(new Node.JoinRequest(), node2);
-
+        coordinator.tell(new Node.StartChatMsg(), coordinator);
 
         try {
             System.out.println("\n\n>>> Wait for the chats to stop and press ENTER <<<\n\n");
