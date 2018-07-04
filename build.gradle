@@ -19,7 +19,7 @@ compileJava {
     options.compilerArgs += ["-Xlint:deprecation"]
 }
 
-mainClassName = "it.unitn.ds1.CausalMulticast"
+mainClassName = "it.unitn.ds1.project.App"
 
 run {
     standardInput = System.in

@@ -36,19 +36,14 @@ class Node extends AbstractActor {
      //        \____|  \___| |_| |_|  \___| |_|     \__,_| |_|
 
     /*
-     * The list of peers (the multicast group)
+     * Current View
      */
-    public List<ActorRef> group;
+    public View view;
 
     /*
-     * The list of peers names (the multicast group)
+     * Old view
      */
-    public List<String> view;
-
-    /*
-     * Number of current view
-     */
-    public int viewCounter;
+    public View oldView;
 
     /*
      * Random Number used to random multicast
@@ -101,7 +96,7 @@ class Node extends AbstractActor {
     /*
      * Am I Unstable?
      */
-    public  boolean unstable = false;
+    public  boolean noMulticastStatus = false;
 
 
     /*
@@ -155,16 +150,15 @@ class Node extends AbstractActor {
     public static class ChatMsg implements Serializable {
 
         public final int senderId;   // the ID of the message sender
-        public String text;         // text of the messagges
-        public int sequenceNumber;
+        public String text;          // text of the messagges
+        public int viewNumber;       // view in which the message belongs
 
-        public ChatMsg(int senderId, String text, int sequenceNumber) {
+        public ChatMsg(int senderId, String text, int viewNumber) {
             this.senderId = senderId;
             this.text = text;
-            this.sequenceNumber = sequenceNumber;
+            this.viewNumber = viewNumber;
         }
     }
-
     /*
      * #4
      * A message requesting to print the chat history
@@ -186,15 +180,10 @@ class Node extends AbstractActor {
      * Same class for both cohort and coordinator, but different in the action implementation
      * fot this reason this Class is map in the subclasses
      */
-    public static class NewView implements Serializable{
-        public final List<ActorRef> group;    // an array of group members
-        public final List<String> view;
-        public final int viewCounter;
-        public NewView(List<ActorRef> group, List<String> view, int viewCounter) {
-            // Copying the group as an unmodifiable list
-            this.group = new ArrayList<ActorRef>(group);
-            this.view = new ArrayList<String>(view);
-            this.viewCounter = viewCounter;
+    public static class NewViewMessage implements Serializable{
+        public final View view;
+        public NewViewMessage(View view) {
+            this.view = view;
         }
     }
 
@@ -204,10 +193,10 @@ class Node extends AbstractActor {
      * I can join the team, yea
      */
     public static class CanJoin implements Serializable{
-        public final NewView newView;    // an array of group members
-        public CanJoin(NewView newView) {
+        public final NewViewMessage newViewMessage;    // an array of group members
+        public CanJoin(NewViewMessage newViewMessage) {
             // Copying the group as an unmodifiable list
-            this.newView = newView;
+            this.newViewMessage = newViewMessage;
         }
     }
 
@@ -230,25 +219,8 @@ class Node extends AbstractActor {
      * Unstable Message
      */
     public static class Unstable implements Serializable{
-        public final NewView view;
-        public Unstable(NewView view ){
-            this.view = view;
-        }
     }
 
-
-    /*
-     * #10
-     * Stable Message
-     */
-    public static class Flush implements Serializable{
-        public final NewView view;
-        public final HashMap<ActorRef, ChatMsg> crashedNodesWithLastMessages;
-        public Flush(NewView view , HashMap<ActorRef, ChatMsg> crashedNodesWithLastMessages){
-            this.view = view;
-            this.crashedNodesWithLastMessages = crashedNodesWithLastMessages;
-        }
-    }
 
 
      //             _             _                                ____           _
@@ -264,7 +236,7 @@ class Node extends AbstractActor {
      * Then print the the fact that it joined
      */
     public void onJoinGroupMsg(JoinGroupMsg msg) {
-        System.out.println("\u001B[36m " + getSelf().path().name() +": joining a group of " + this.group.size() + "peers with ID " + this.id);
+        System.out.println("\u001B[36m " + getSelf().path().name() +": joining a group of " + this.view.getGroup().size() + "peers with ID " + this.id);
     }
 
 
@@ -298,7 +270,7 @@ class Node extends AbstractActor {
      * Unstable Message
      */
     public void onUnstable(Unstable unstable){
-        this.unstable = true;
+
     }
 
 
@@ -321,12 +293,12 @@ class Node extends AbstractActor {
      */
     public void sendChatMsg() {
 
-        if (crashed || unstable) return;
+        if (crashed || noMulticastStatus) return;
 
 
         if(this.id == 3){
             System.err.print( "Message in multicast -> id: " + this.id + ", text: LOST_MESSAGE" +"\n");
-            this.group.get(1).tell(new ChatMsg(this.id, "LOST_MESSAGE", ++this.sendCount), getSelf());
+            this.view.getGroup().get(1).tell(new ChatMsg(this.id, "LOST_MESSAGE", ++this.sendCount), getSelf());
             getSelf().tell(new NodeParticipant.Crash(60), null);
             try {
                 Thread.sleep(1000);
@@ -339,8 +311,6 @@ class Node extends AbstractActor {
 
         this.sendCount++;
         ChatMsg m = new ChatMsg(this.id,"[~" + numberToString((int) (Math.random()*1000000)%99999) + "]", this.sendCount);
-        out = this.id + " send multicast " + m.text + " within " + this.viewCounter + "\n";
-        MulticastLog(out);
         System.err.print( "Message in multicast -> id: " + this.id + ", text: " + m.text +"\n");
         multicast(m);
         appendToHistory(m); // append the sent message
@@ -351,7 +321,7 @@ class Node extends AbstractActor {
      * We model random network delays with this code
      */
     public void multicast(Serializable m) { // our multicast implementation
-        List<ActorRef> shuffledGroup = new ArrayList<>(group);
+        List<ActorRef> shuffledGroup = new ArrayList<>(view.getGroup());
         Collections.shuffle(shuffledGroup);
         for (ActorRef p: shuffledGroup) {
             if (!p.equals(getSelf())) { // not sending to self
@@ -370,12 +340,10 @@ class Node extends AbstractActor {
      *  then If I have other msg to send I do it
      */
     public void deliver(ChatMsg m) {
-
-        appendToHistory(m);
-        out = this.id + " deliver multicast " + m.text + " from "  + m.senderId + " within " + this.viewCounter + "\n";
-        MulticastLog(out);
-        System.out.println("\u001B[35m" + "Message \"" + m.text + "\" from " + m.senderId + " deliver to Node: " + this.id);
-
+        if(m != null) {
+            appendToHistory(m);
+            System.out.println("\u001B[35m" + "Message \"" + m.text + "\" from " + m.senderId + " deliver to Node: " + this.id);
+        }
     }
 
 
@@ -383,7 +351,7 @@ class Node extends AbstractActor {
      * Append to the History
      */
     public void appendToHistory(ChatMsg m) {
-        this.chatHistory.append(  "[" + m.senderId + "," + m.text + "]");
+            this.chatHistory.append("[" + m.senderId + "," + m.text + "]");
     }
 
 
@@ -403,111 +371,5 @@ class Node extends AbstractActor {
         return i > 0 && i < 27 ? String.valueOf((char)(i + 64)) : null;
     }
 
-    /*
-     * Creates log file
-     */
-    public void MulticastLog(String text) {
-
-        String FILENAME = "multicast.log";
-
-        BufferedWriter bw = null;
-        FileWriter fw = null;
-
-        try {
-
-            // String content = "This is the content to write into file\n";
-
-            fw = new FileWriter(FILENAME, true);
-            bw = new BufferedWriter(fw);
-            bw.write(text);
-
-            //System.out.println("Done");
-
-        } catch (IOException e) {
-
-            e.printStackTrace();
-
-        } finally {
-
-            try {
-
-                if (bw != null)
-                    bw.close();
-
-                if (fw != null)
-                    fw.close();
-
-            } catch (IOException ex) {
-
-                ex.printStackTrace();
-
-            }
-
-        }
-
-    }
-
-
-    /*
-     * Check if the last message arrived from a crashed nodes is really the last message
-     */
-    public void checkForLastMessages(HashMap<ActorRef, ChatMsg> hm){
-
-
-        for(Map.Entry<ActorRef, ChatMsg> entry : hm.entrySet()){
-            ActorRef key = entry.getKey();
-            ChatMsg value = entry.getValue();
-
-            if(this.lastMessages.get(key) == null && value != null){
-                lastMessages.put(key, value);
-            }
-            else if(value != null && value.sequenceNumber == this.lastMessages.get(key).sequenceNumber+1 ){
-                    deliver(lastMessages.get(key));
-                    lastMessages.put(key, value);
-            }
-        }
-
-    }
-
-
-
-    /*
-     * Map each crashed node with the last message arrived in this node
-     */
-    public HashMap<ActorRef, ChatMsg> checkForCrashedNodesMessages(NewView newView) {
-
-        HashMap<ActorRef, ChatMsg> ret = new HashMap<>();
-
-        if (this.group != null && this.group.size() > newView.group.size()) {
-
-            List<ActorRef> CrashedPeers = new ArrayList<>(this.group);
-            CrashedPeers.removeIf(item -> newView.group.contains(item));
-            String s = getSelf().path().name() + "->";
-            for (ActorRef a : CrashedPeers) {
-                if(this.lastMessages.get(a)!=null){
-                    ret.put(a, this.lastMessages.get(a));
-                    s = s.concat("[" + a.path().name() + ";" + this.lastMessages.get(a).text + "]");
-                }
-                else {
-                    ret.put(a, null);
-                    s = s.concat("[ " + a.path().name() + ";" + " no message yet]");
-                }
-
-            }
-            System.out.println(s);
-        }
-        return ret;
-
-    }
-
-
-    public void deliverInTheEndAfterCrash(Map<ActorRef,ChatMsg> hm){
-
-        for(Map.Entry<ActorRef, ChatMsg> entry : hm.entrySet()){
-            ActorRef key = entry.getKey();
-            ChatMsg value = entry.getValue();
-            if(value != null) deliver(lastMessages.get(key));
-        }
-    }
 
 }

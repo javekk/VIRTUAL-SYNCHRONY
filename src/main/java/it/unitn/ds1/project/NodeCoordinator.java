@@ -22,22 +22,6 @@ public class NodeCoordinator extends Node {
 
 
     /*
-     * id counter
-     */
-    private int idCounter = 0;
-
-    /*
-     * list of names in view
-     *View
-     */
-    public List<String> view;
-
-    /*
-     * number of view
-     */
-    public int viewCounter = 0;
-
-    /*
      * HashMap Used for detect the crashes
      */
     private HashMap<ActorRef, Boolean> fromWhomTheMessagesArrived;
@@ -46,16 +30,18 @@ public class NodeCoordinator extends Node {
      * Actor Constructor
      */
     NodeCoordinator(int id) {
+
         this.id = id;
-        if(this.group == null){
-            this.group = new ArrayList<>();
-            this.group.add(getSelf());
 
-            this.view = new ArrayList<>();
-            this.view.add(getSelf().path().name().substring(4));
-            this.fromWhomTheMessagesArrived = new HashMap<>();
+        List<ActorRef> group = new ArrayList<>();
+        group.add(getSelf());
+        List<String> viewAsString = new ArrayList<>(0);
+        viewAsString.add(getSelf().path().name().substring(4));
 
-        }
+        this.view = new View(group, viewAsString, 0);
+
+        this.fromWhomTheMessagesArrived = new HashMap<>();
+
     }
     static Props props(int id) {
         return Props.create(NodeCoordinator.class, () -> new NodeCoordinator(id));
@@ -84,7 +70,6 @@ public class NodeCoordinator extends Node {
                 .match(PrintHistoryMsg.class, this::printHistory)      //#4
                 .match(JoinRequest.class,    this::onJoinRequest)      //#6
                 .match(Unstable.class,    this::onUnstable)      //#9
-                .match(Flush.class, this::onFlush) //#10
                 .build();
     }
 
@@ -143,74 +128,23 @@ public class NodeCoordinator extends Node {
 
 
         System.out.println("\u001B[34m" + getSender().path().name() + " asking for joining");
-        this.unstable = true;
         /*
          * Send the new id to the new node
          */
-        int id = group.size() == 0 ? 0 : group.size();
+        int id = view.getGroup().size() == 0 ? 0 : view.getGroup().size();
         getSender().tell(new NewId(id), getSelf());
 
-        /*
-         * Add new node to the view
-         */
-        this.view.add(getSender().path().name().substring(4));
 
-        /*
-         * Increase view number
-         */
-        this.viewCounter++;
-
-        /*
-         * I send to anybody the new view with the new peer
-         */
-        this.group.add(getSender());
-        this.fromWhomTheMessagesArrived.put(getSender(), true);
-        NewView newView = new NewView(this.group, this.view, this.viewCounter);
-        System.out.println("\u001B[34m" + getSelf().path().name() + " sending new view with " + this.view.toString());
-
-        /*
-         * Finally I can send the ok for enter to the requester
-         */
-        getSender().tell(new CanJoin(newView), getSelf());
-        this.multicast(newView);
-        this.multicast(new Flush(newView, new HashMap<>()));
 
     }
 
-
-    /*
-     * #10
-     * On stable messages
-     * I may received a flush with the new view, before receiving the new view
-     *      |---> delete the old new view, it will arrive for sure, since the coordinator is reliable
-     * Mark the sender as flush-received
-     * Check if I did not receive the last message from the crashed nodes, and if not, deliver the last but one and hold the real last
-     *
-     */
-    public void onFlush(Flush flush){
-
-        if(flush.view.viewCounter < this.viewCounter) return;
-
-        this.flushMessagesTracker.add(getSender());
-        System.out.println("\u001B[32m Flush arrived from "+ getSender().path().name() + " to " + this.id +  " for view: "+ this.view.toString()); //add list of node inside view
-        this.checkForLastMessages(flush.crashedNodesWithLastMessages); //if there were some crashes and I did not receive the last messages
-
-        if((this.flushMessagesTracker.size()+1) == this.group.size()){
-            //stable
-            out = getSelf().path().name().substring(4) + " install view " + this.viewCounter + " " + this.view.toString() + "\n";
-            System.out.println("\u001B[33m" + getSelf().path().name() + " INSTALL a new View: " + this.view.toString()); //add list of node inside view
-            this.unstable = false;
-            this.flushMessagesTracker.removeAll(this.flushMessagesTracker);
-            this.deliverInTheEndAfterCrash(flush.crashedNodesWithLastMessages);
-        }
-    }
 
 
 
 
     private void crashDetector(){
 
-        if(this.unstable) return;
+        if(this.noMulticastStatus) return;
 
         /*
          * If I find some false values, means that no messages arrived from that peers
@@ -228,22 +162,7 @@ public class NodeCoordinator extends Node {
         if(!crashedPeers.isEmpty()){
 
             System.out.println("OMG!!! Someone is crashed! ___look who's crashed->" + this.fromWhomTheMessagesArrived.toString());
-            /*
-             *
-             */
-             for(ActorRef a :crashedPeers){
-                this.fromWhomTheMessagesArrived.remove(a);
-                this.group.remove(a);
-                for(int i = 0; i < view.size(); i++){
-                    if(view.get(i).equals(a.path().name().substring(4))) view.remove(i);
-                }
-             }
 
-             this.viewCounter++;
-
-             NewView newView = new NewView(this.group, this.view, this.viewCounter);
-             this.multicast(newView);
-             multicast(new Flush(newView, this.checkForCrashedNodesMessagesCoordinator(crashedPeers)));
 
         }
 
@@ -259,24 +178,6 @@ public class NodeCoordinator extends Node {
     }
 
 
-    public HashMap<ActorRef, ChatMsg> checkForCrashedNodesMessagesCoordinator(List<ActorRef> crashedNodes){
 
-        HashMap<ActorRef, ChatMsg> ret = new HashMap<>();
-
-        String s = getSelf().path().name() + "->";
-        for(ActorRef a : crashedNodes){
-            if(this.lastMessages.get(a)!=null){
-                ret.put(a, this.lastMessages.get(a));
-                s = s.concat("[" + a.path().name() + ";" + this.lastMessages.get(a).text + "]");
-            }
-            else {
-                ret.put(a, null);
-                s = s.concat("[ " + a.path().name() + ";" + " no message yet]");
-            }
-        }
-        System.out.println(s);
-        return ret;
-
-    }
 
 }
