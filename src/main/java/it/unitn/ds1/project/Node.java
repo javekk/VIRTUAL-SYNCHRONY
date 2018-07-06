@@ -273,7 +273,7 @@ class Node extends AbstractActor {
              //is a copy and it is not my msg
              if(msg.viewNumber == this.view.viewCounter){
                  //we are in the same view
-                 if(msg.sequenceNumber > this.lastMessages.get(msg.actorRef).sequenceNumber){
+                 if(this.lastMessages.get(msg.actorRef) == null || msg.sequenceNumber > this.lastMessages.get(msg.actorRef).sequenceNumber){
                      //we use the sequence number to check if the message is a duplicate
                      deliver(msg);
                      this.lastMessages.put(msg.actorRef, msg);
@@ -319,8 +319,8 @@ class Node extends AbstractActor {
         if(currentFlushesForTheNextView.size() == numberOfFlushNeeded-1){
             this.view = currentFlushesForTheNextView.get(0).view; //install the new view i+1
             this.flushBuffer.removeAll(currentFlushesForTheNextView);
-            System.out.println("\u001B[33m" + getSelf().path().name() + "-> INSTALL new View: " + this.view.viewAsString.toString()); //add list of node inside view
-            //deliverBuffered();
+            System.out.println("\u001B[33m" + getSelf().path().name() + "-> INSTALL View" + this.view.viewCounter + ": " + this.view.viewAsString.toString()); //add list of node inside view
+            deliverBuffered();
             this.inhibit_sends--;
             this.hasInstalledTheFirstView = true;
          }

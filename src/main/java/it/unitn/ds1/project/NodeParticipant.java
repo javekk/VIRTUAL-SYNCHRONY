@@ -18,16 +18,10 @@ public class NodeParticipant extends Node {
     //
 
     /*
-     * This is the coordinator. id 0 default
-     */
-    public int coordinatorId;
-
-    /*
      * Actor Constructor
      */
-    public NodeParticipant(){}
-    static public Props props() {
-        return Props.create(NodeParticipant.class, () -> new NodeParticipant());
+    static Props props() {
+        return Props.create(NodeParticipant.class, NodeParticipant::new);
     }
 
 
@@ -63,9 +57,9 @@ public class NodeParticipant extends Node {
      * #p1
      * I wanna crash
      */
-    public static class Crash implements Serializable {
-        public final int delay;
-        public Crash(int delay) {
+    static class Crash implements Serializable {
+        final int delay;
+        Crash(int delay) {
             this.delay = delay;
         }
 
@@ -100,7 +94,7 @@ public class NodeParticipant extends Node {
      * #8
      * I have a new ID, yea
      */
-    public void onInit(initNode initNode) {
+    private void onInit(initNode initNode) {
         this.id = initNode.newId;
         this.view = initNode.initialView; //in the init part
 
@@ -108,7 +102,7 @@ public class NodeParticipant extends Node {
         getContext().system().scheduler().schedule(
                 Duration.create(100, TimeUnit.MILLISECONDS),
                 Duration.create(4500, TimeUnit.MILLISECONDS),
-                () -> sendHeartBeats(),
+                this::sendHeartBeats,
                 getContext().system().dispatcher());
     }
 
@@ -117,7 +111,7 @@ public class NodeParticipant extends Node {
      * #p1
      * emulate a crash and a recovery in a given time
      */
-    public void onCrash(Crash c) {
+    private void onCrash(Crash c) {
         this.crashed = true;
         System.out.println("+++" + getSelf().path().name() + " just crashed+++");
 
@@ -142,11 +136,11 @@ public class NodeParticipant extends Node {
     //                           |_|                  |___/
 
 
-    public void sendHeartBeats(){
+    private void sendHeartBeats(){
 
-        if (crashed || (inhibit_sends > 0) || view == null) return;
+        if (crashed || view == null) return;
 
-        this.view.group.get(0).tell(HeartBeat.class, getSelf());
+        this.view.group.get(0).tell(new HeartBeat(), getSelf());
     }
 
 }

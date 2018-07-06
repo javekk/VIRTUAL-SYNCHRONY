@@ -108,8 +108,8 @@ public class NodeCoordinator extends Node {
     public void preStart() {
 
         getContext().system().scheduler().schedule(
+                Duration.create(5, TimeUnit.SECONDS),
                 Duration.create(10, TimeUnit.SECONDS),
-                Duration.create(15, TimeUnit.SECONDS),
                 () -> crashDetector(),
                 getContext().system().dispatcher());
     }
@@ -137,13 +137,15 @@ public class NodeCoordinator extends Node {
         View newView = this.getNewView(getSender());
 
         multicastAllUnstableMessages(newView);
+
+        System.out.println("  \u001B[31m" + getSelf().path().name() +" -> multicast view" + newView.viewCounter + ":" + newView.viewAsString.toString());
         multicast(newView, newView);
         multicast(new Flush(newView), newView);
 
     }
 
 
-    private void onHeartBeat(HeartBeat hb){
+    public void onHeartBeat(HeartBeat hb){
         this.fromWhomTheMessagesArrived.put(getSender(), true);
     }
 
@@ -168,6 +170,8 @@ public class NodeCoordinator extends Node {
             //create and send the new view
             View newView = this.getTheNewViewFromCrashed(crashedPeers);
             multicastAllUnstableMessages(newView);
+
+            System.out.println("  \u001B[31m" + getSelf().path().name() +" -> multicast view" + newView.viewCounter + ":" + newView.viewAsString.toString());
             multicast(newView, newView);
             multicast(new Flush(newView), newView);
         }
@@ -182,8 +186,9 @@ public class NodeCoordinator extends Node {
 
 
     /*
-     * Method to create a new view
+     * Methods to create a new view
      */
+
     public View getNewView(ActorRef newPeer) {
 
         if (this.view_buffer == null) {
@@ -203,7 +208,6 @@ public class NodeCoordinator extends Node {
 
         return v;
     }
-
 
     public View getTheNewViewFromCrashed(List<ActorRef> crashedNodes){
 
