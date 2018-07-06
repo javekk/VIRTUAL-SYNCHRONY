@@ -89,10 +89,10 @@ class Node extends AbstractActor {
     public List<Flush> flushBuffer = new ArrayList<>();
 
 
-    /*
-     * Contructor
-     */
-
+     /*
+      * init param
+      */
+     boolean hasInstalledTheFirstView = false;
 
     //         __  __                   _____                                             ____   _
     //        |  \/  |  ___    __ _    |_   _|  _   _   _ __     ___   ___               / ___| | |   __ _   ___   ___    ___   ___
@@ -134,14 +134,14 @@ class Node extends AbstractActor {
      */
     public static class ChatMsg implements Serializable {
 
-        public final int senderId;   // the ID of the message sender
+        public final ActorRef actorRef;   // the actorRef
         public final String text;          // text of the messagges
         public final int viewNumber;       // view in which the message belongs
         public final int sequenceNumber;   // sequence number of the message
         public final boolean isACopy;      // to say if we're dealing with unstable messages
 
-        public ChatMsg(int senderId, String text, int viewNumber, int sequenceNumber, boolean isACopy) {
-            this.senderId = senderId;
+        public ChatMsg(ActorRef actorRef, String text, int viewNumber, int sequenceNumber, boolean isACopy) {
+            this.actorRef = actorRef;
             this.text = text;
             this.viewNumber = viewNumber;
             this.sequenceNumber = sequenceNumber;
@@ -207,6 +207,11 @@ class Node extends AbstractActor {
     }
 
 
+    /*
+     * HeartBeat
+     */
+    public  static class HeartBeat implements Serializable{};
+
      //             _             _                                ____           _
      //            / \      ___  | |_    ___    _ __              | __ )    ___  | |__     __ _  __   __
      //           / _ \    / __| | __|  / _ \  | '__|    _____    |  _ \   / _ \ | '_ \   / _` | \ \ / /
@@ -231,6 +236,7 @@ class Node extends AbstractActor {
      */
     public void onStartChatMsg(StartChatMsg msg) {
 
+        //start messagging
         getContext().system().scheduler().schedule(
                 Duration.create((int)(5000*Math.random()), TimeUnit.MILLISECONDS),
                 Duration.create((int)(5000*Math.random())+1000, TimeUnit.MILLISECONDS),
@@ -238,6 +244,49 @@ class Node extends AbstractActor {
                 getContext().system().dispatcher());
 
     }
+
+
+     /*
+      * #3
+      * When we received a Message
+      * I get the last Message from the sender(to drop)
+      * I replace the last message with the new one
+      * I deliver/drop the Old Message
+      */
+     public void onChatMsg(ChatMsg msg) {
+
+         if(this instanceof NodeParticipant && !hasInstalledTheFirstView) return;
+
+         if(crashed) return;
+
+         System.out.println("\u001B[36m" + getSelf().path().name() + "-> ARRIVED " + msg.text +"; sender: " + msg.actorRef.path().name() + "; view " + msg.viewNumber); //add list of node inside view
+
+
+         if(!msg.isACopy && msg.viewNumber == this.view.viewCounter){
+             // normal message
+             if (lastMessages.get(getSender()) != null) {
+                 deliver(lastMessages.get(getSender()));
+             }
+             lastMessages.put(getSender(), msg);
+         }
+         else if (msg.isACopy && msg.actorRef != getSelf()){
+             //is a copy and it is not my msg
+             if(msg.viewNumber == this.view.viewCounter){
+                 //we are in the same view
+                 if(msg.sequenceNumber > this.lastMessages.get(msg.actorRef).sequenceNumber){
+                     //we use the sequence number to check if the message is a duplicate
+                     deliver(msg);
+                     this.lastMessages.put(msg.actorRef, msg);
+                 }
+             }
+             else if(msg.viewNumber > this.view.viewCounter){
+                 //save in the buffer
+                 messagesBuffer.add(msg);
+             }
+             //else if(msg.viewNumber < this.view.getViewCounter()) -> message is a duplicate, ignore it
+
+         }
+     }
 
 
     /*
@@ -260,9 +309,6 @@ class Node extends AbstractActor {
 
         List<Flush> currentFlushesForTheNextView = new ArrayList<>();
 
-        System.out.println("\u001B[33m" + getSelf().path().name() + " FLUSH arrived from " + getSender().path().name() + " for the view " + flush.view.viewCounter); //add list of node inside view
-
-
         for(Flush f: this.flushBuffer){
             numberOfFlushNeeded = Math.min(numberOfFlushNeeded, f.view.group.size());
             if(f.view.viewCounter == this.view.viewCounter+1){
@@ -271,10 +317,12 @@ class Node extends AbstractActor {
         }
 
         if(currentFlushesForTheNextView.size() == numberOfFlushNeeded-1){
-             this.view = currentFlushesForTheNextView.get(0).view; //install the new view i+1
-             this.flushBuffer.removeAll(currentFlushesForTheNextView);
-             System.out.println("\u001B[33m" + getSelf().path().name() + " INSTALL a new View: " + this.view.viewAsString.toString()); //add list of node inside view
-             this.inhibit_sends--;
+            this.view = currentFlushesForTheNextView.get(0).view; //install the new view i+1
+            this.flushBuffer.removeAll(currentFlushesForTheNextView);
+            System.out.println("\u001B[33m" + getSelf().path().name() + "-> INSTALL new View: " + this.view.viewAsString.toString()); //add list of node inside view
+            //deliverBuffered();
+            this.inhibit_sends--;
+            this.hasInstalledTheFirstView = true;
          }
      }
 
@@ -299,12 +347,12 @@ class Node extends AbstractActor {
 
         if (crashed || (inhibit_sends > 0) || view == null) return;
 
-
         this.sendCount++;
-        /*
+
         if(this.id == 3){
-            System.err.print( "Message in multicast -> id: " + this.id + ", text: LOST_MESSAGE" +"\n");
-            this.view.getGroup().get(1).tell(new ChatMsg(this.id, "LOST_MESSAGE", this.view.getViewCounter(), this.sendCount, false), getSelf());
+            System.out.println(" \u001B[31m" + getSelf().path().name() + " -> message in multicast -> text: " + "LOST_MESSAGE" + "; view: " + this.view.viewCounter);
+
+            this.view.group.get(1).tell(new ChatMsg(getSelf(), "LOST_MESSAGE", this.view.viewCounter, this.sendCount, false), getSelf());
             getSelf().tell(new NodeParticipant.Crash(60), null);
             try {
                 Thread.sleep(1000);
@@ -314,15 +362,15 @@ class Node extends AbstractActor {
                 return;
             }
         }
-        */
+
         ChatMsg m = new ChatMsg(
-                this.id,
+                getSelf(),
                 "[~" + numberToString((int) (Math.random()*1000000)%99999) + "]",
                 this.view.viewCounter,
                 this.sendCount,
                 false);
 
-        System.out.println(" \u001B[31m Message in multicast -> id: " + this.id + ", text: " + m.text + " in the view: " + this.view.viewCounter);
+        System.out.println(" \u001B[31m" + getSelf().path().name() + " -> message in multicast -> text: " + m.text + "; view: " + this.view.viewCounter);
         multicast(m, this.view);
         appendToHistory(m); // append the sent message
     }
@@ -348,9 +396,9 @@ class Node extends AbstractActor {
      * Deliver the message
      */
     public void deliver(ChatMsg m) {
-        if(m != null) {
+        if(m != null && m.viewNumber == this.view.viewCounter) {
             appendToHistory(m);
-            System.out.println("\u001B[35m" + "Message \"" + m.text + "\" from " + getSender().path().name() + " deliver to " + this.id + " within the view " + m.viewNumber);
+            System.out.println("\u001B[35m"+ getSelf().path().name() + "-> DELIVER " + m.text + "; sender:" + m.actorRef.path().name() + "; view:" + m.viewNumber);
         }
     }
 
@@ -359,7 +407,7 @@ class Node extends AbstractActor {
      * Append to the History
      */
     public void appendToHistory(ChatMsg m) {
-            this.chatHistory.append("[" + m.senderId + "," + m.text + "]");
+            this.chatHistory.append("[" + m.actorRef.path().name() + "," + m.text + "]");
     }
 
 
@@ -368,18 +416,18 @@ class Node extends AbstractActor {
       */
      public void multicastAllUnstableMessages(View view){
 
-         for (Map.Entry<ActorRef, ChatMsg> entry : lastMessages.entrySet()){
-
+         for (Map.Entry<ActorRef, ChatMsg> entry : this.lastMessages.entrySet()){
              ChatMsg unstableMsg = entry.getValue();
 
-             if(unstableMsg.viewNumber < view.viewCounter){
+             if(unstableMsg != null && unstableMsg.viewNumber < view.viewCounter){
 
-                 multicast(new ChatMsg( unstableMsg.senderId,
-                         unstableMsg.text,
-                         view.viewCounter, // we send the unstable message in the new view
-                         unstableMsg.sequenceNumber,
-                         true), //is a copy?
-                         view);
+                 System.out.println("     \u001B[31m" + getSelf().path().name() +" -> unstable message in multicast; sender:" + unstableMsg.actorRef.path().name() + "; text: " + unstableMsg.text + "; view: " + unstableMsg.viewNumber);
+                 multicast(new ChatMsg(unstableMsg.actorRef,
+                                       unstableMsg.text,
+                                       unstableMsg.viewNumber, // we send the unstable message in the new view
+                                       unstableMsg.sequenceNumber,
+                                     true), //is a copy?
+                            view);
 
                  /*Now the message is stable, so I can deliver it*/
                  deliver(unstableMsg);
@@ -388,6 +436,14 @@ class Node extends AbstractActor {
      }
 
 
+     public void deliverBuffered(){
+         for(ChatMsg msg : this.messagesBuffer){
+             if(msg.viewNumber == this.view.viewCounter){
+                 deliver(msg);
+                 this.lastMessages.put(msg.actorRef,msg);
+             }
+         }
+     }
 
      /*
       * Transform a Number to A String

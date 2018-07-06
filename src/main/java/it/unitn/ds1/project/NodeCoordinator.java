@@ -83,12 +83,13 @@ public class NodeCoordinator extends Node {
     @Override
     public Receive createReceive() {
         return receiveBuilder()
-                .match(JoinGroupMsg.class,    this::onJoinGroupMsg)    //#1
-                .match(StartChatMsg.class,    this::onStartChatMsg)    //#2
-                .match(ChatMsg.class,         this::onChatMsg)         //#3
+                .match(JoinGroupMsg.class, this::onJoinGroupMsg)    //#1
+                .match(StartChatMsg.class, this::onStartChatMsg)    //#2
+                .match(ChatMsg.class, this::onChatMsg)         //#3
                 .match(PrintHistoryMsg.class, this::printHistory)      //#4
-                .match(JoinRequest.class,    this::onJoinRequest)      //#6
+                .match(JoinRequest.class, this::onJoinRequest)      //#6
                 .match(Flush.class, this::onFlush)
+                .match(HeartBeat.class, this::onHeartBeat)
                 .build();
     }
 
@@ -114,43 +115,6 @@ public class NodeCoordinator extends Node {
     }
 
 
-    /*
-     * #3
-     * When we received a Message
-     * I get the last Message from the sender(to drop)
-     * I replace the last message with the new one
-     * I set that I received the message
-     * I deliver/drop the Old Message
-     */
-    public void onChatMsg(ChatMsg msg) {
-
-        this.fromWhomTheMessagesArrived.replace(getSender(), true);
-
-        if(!msg.isACopy && msg.viewNumber == this.view.viewCounter){
-            System.out.println("\u001B[33m" + getSelf().path().name() + ": " + msg.text +" arrived from " + getSender().path().name() + " for the view " + this.view.viewCounter); //add list of node inside view
-            // normal message
-            if (lastMessages.get(getSender()) != null) {
-                deliver(lastMessages.get(getSender()));
-            }
-            lastMessages.put(getSender(), msg);
-        }
-        else{
-            //is a copy
-            if(msg.viewNumber == this.view.viewCounter){
-                //we are in the same view
-                if(msg.sequenceNumber > this.lastMessages.get(getSender()).sequenceNumber){
-                    //we use the sequence number to check if the message is a duplicate
-                    deliver(msg);
-                }
-            }
-            else if(msg.viewNumber > this.view.viewCounter){
-                //save in the buffer
-                messagesBuffer.add(msg);
-            }
-            //else if(msg.viewNumber < this.view.getViewCounter()) -> message is a duplicate, ignore it
-        }
-    }
-
 
     /*
      * #5
@@ -158,62 +122,71 @@ public class NodeCoordinator extends Node {
      */
     public void onJoinRequest(JoinRequest jr) {
 
-        System.out.println("\u001B[34m" + getSender().path().name() + " asking for joining");
+        System.out.println("\u001B[34m" + getSender().path().name() + "-> asking for joining");
 
-        if(this.view_buffer == null) this.view_buffer = new View(this.view.group, this.view.viewAsString, this.view.viewCounter);
+        if (this.view_buffer == null) {
+            this.view_buffer = new View(this.view.group, this.view.viewAsString, this.view.viewCounter);
+        }
+
         getSender().tell(new initNode(++this.idinit, this.view_buffer), getSelf());
 
         getSender().tell(new StartChatMsg(), getSelf());
 
+        this.fromWhomTheMessagesArrived.put(getSender(), true);
+
         View newView = this.getNewView(getSender());
 
+        multicastAllUnstableMessages(newView);
         multicast(newView, newView);
-
         multicast(new Flush(newView), newView);
 
     }
 
 
-   private void crashDetector(){
+    private void onHeartBeat(HeartBeat hb){
+        this.fromWhomTheMessagesArrived.put(getSender(), true);
+    }
 
-        if(inhibit_sends != 0) return;
 
-        /*
-         * If I find some false values, means that no messages arrived from that peers
-         */
+    private void crashDetector() {
+
+        //If I find some false values, means that no messages arrived from that peers
         List<ActorRef> crashedPeers = new ArrayList<>();
-        for(Map.Entry<ActorRef, Boolean> entry : this.fromWhomTheMessagesArrived.entrySet()){
+        HashMap<ActorRef,Boolean> hm = new HashMap<>(this.fromWhomTheMessagesArrived);
+        for (Map.Entry<ActorRef, Boolean> entry : hm.entrySet()) {
             ActorRef key = entry.getKey();
-            Boolean value = entry.getValue();
-            if(!value) crashedPeers.add(key);
+            boolean value = entry.getValue();
+            if (!value){
+                crashedPeers.add(key);
+                this.fromWhomTheMessagesArrived.remove(key);
+            }
         }
 
-        /*
-         * OMG! INDIGNAZIONE!!!!!
-         */
-        if(!crashedPeers.isEmpty()){
-            System.out.println("OMG!!! Someone is crashed! ___look who's crashed->" + this.fromWhomTheMessagesArrived.toString());
+        if (!crashedPeers.isEmpty()) {
+            //OMG! INDIGNAZIONE!!!!!
+            System.out.println("OMG!!! Someone is crashed! ___look who's crashed->" + crashedPeers.toString());
+            //create and send the new view
+            View newView = this.getTheNewViewFromCrashed(crashedPeers);
+            multicastAllUnstableMessages(newView);
+            multicast(newView, newView);
+            multicast(new Flush(newView), newView);
         }
 
 
-        /*
-         * Bring all to false, waiting for messages
-         */
-        for(Map.Entry<ActorRef, Boolean> entry : this.fromWhomTheMessagesArrived.entrySet()){
+        //Bring all to false, waiting for messages
+        for (Map.Entry<ActorRef, Boolean> entry : this.fromWhomTheMessagesArrived.entrySet()) {
             ActorRef key = entry.getKey();
             this.fromWhomTheMessagesArrived.replace(key, false);
         }
-
     }
-
 
 
     /*
      * Method to create a new view
      */
-    public View getNewView(ActorRef newPeer){
+    public View getNewView(ActorRef newPeer) {
 
-        if(this.view_buffer == null){
+        if (this.view_buffer == null) {
             this.view_buffer = new View(this.view.group, this.view.viewAsString, this.view.viewCounter);
         }
 
@@ -223,7 +196,7 @@ public class NodeCoordinator extends Node {
         List<String> names = new ArrayList<>(this.view_buffer.viewAsString);
         names.add(newPeer.path().name().substring(4));
 
-        int i = this.view_buffer.viewCounter+1;
+        int i = this.view_buffer.viewCounter + 1;
         View v = new View(actors, names, i);
 
         this.view_buffer = v;
@@ -231,4 +204,26 @@ public class NodeCoordinator extends Node {
         return v;
     }
 
+
+    public View getTheNewViewFromCrashed(List<ActorRef> crashedNodes){
+
+        if (this.view_buffer == null) {
+            this.view_buffer = new View(this.view.group, this.view.viewAsString, this.view.viewCounter);
+        }
+
+        List<ActorRef> actors = new ArrayList<>(this.view_buffer.group);
+        actors.removeAll(crashedNodes);
+
+        List<String> names = new ArrayList<>(this.view_buffer.viewAsString);
+        for(ActorRef peer :crashedNodes){
+            names.remove(peer.path().name().substring(4));
+        }
+
+        int i = this.view_buffer.viewCounter + 1;
+        View v = new View(actors, names, i);
+
+        this.view_buffer = v;
+
+        return v;
+    }
 }

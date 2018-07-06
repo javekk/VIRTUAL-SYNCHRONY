@@ -79,42 +79,6 @@ public class NodeParticipant extends Node {
     //         /_/   \_\  \___|  \__|  \___/  |_|                |____/   \___| |_| |_|  \__,_|   \_/
 
 
-    /*
-     * #3
-     * When we received a Message
-     * I get the last Message from the sender(to drop)
-     * I replace the last message with the new one
-     * I deliver/drop the Old Message
-     */
-    public void onChatMsg(ChatMsg msg) {
-
-        if(crashed) return;
-
-        if(!msg.isACopy && msg.viewNumber == this.view.viewCounter){
-            // normal message
-            System.out.println("\u001B[33m" + getSelf().path().name() + ": " + msg.text +" arrived from " + getSender().path().name() + " for the view " + this.view.viewCounter); //add list of node inside view
-            if (lastMessages.get(getSender()) != null) {
-                deliver(lastMessages.get(getSender()));
-            }
-            lastMessages.put(getSender(), msg);
-        }
-        else{
-            //is a copy
-            if(msg.viewNumber == this.view.viewCounter){
-                //we are in the same view
-                if(msg.sequenceNumber > this.lastMessages.get(getSender()).sequenceNumber){
-                    //we use the sequence number to check if the message is a duplicate
-                    deliver(msg);
-                }
-            }
-            else if(msg.viewNumber > this.view.viewCounter){
-                //save in the buffer
-                messagesBuffer.add(msg);
-            }
-            //else if(msg.viewNumber < this.view.getViewCounter()) -> message is a duplicate, ignore it
-
-        }
-    }
 
 
     /*
@@ -124,16 +88,11 @@ public class NodeParticipant extends Node {
 
         this.inhibit_sends++;
 
-        /*
-         * Multicast (and deliver) all the unstable message
-         */
+        //Multicast (and deliver) all the unstable message
         multicastAllUnstableMessages(view);
 
-        /*
-         * Flush the view
-         */
+        //Flush the view
         multicast(new Flush(view), view);
-
     }
 
 
@@ -143,9 +102,15 @@ public class NodeParticipant extends Node {
      */
     public void onInit(initNode initNode) {
         this.id = initNode.newId;
-        this.view = initNode.initialView; //in the init part I use the previuos view in practise it is needed only for the counter
-    }
+        this.view = initNode.initialView; //in the init part
 
+        //start sending heartbeats to the coordinator
+        getContext().system().scheduler().schedule(
+                Duration.create(100, TimeUnit.MILLISECONDS),
+                Duration.create(4500, TimeUnit.MILLISECONDS),
+                () -> sendHeartBeats(),
+                getContext().system().dispatcher());
+    }
 
 
     /*
@@ -176,5 +141,12 @@ public class NodeParticipant extends Node {
     //        |_| |_|  \___| |_| | .__/  |_| |_| |_|  \__, |   |_|      \__,_| |_| |_|  \___| |___/
     //                           |_|                  |___/
 
+
+    public void sendHeartBeats(){
+
+        if (crashed || (inhibit_sends > 0) || view == null) return;
+
+        this.view.group.get(0).tell(HeartBeat.class, getSelf());
+    }
 
 }
