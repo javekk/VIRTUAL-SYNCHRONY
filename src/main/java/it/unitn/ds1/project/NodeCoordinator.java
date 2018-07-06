@@ -20,11 +20,27 @@ public class NodeCoordinator extends Node {
     //        |_| \_|  \___/   \__,_|  \___|   |_|     |_|     \___/  | .__/  |___/
     //
 
+    /*
+     * Guarantee the increase of the view counter
+     */
+    private int viewinit = 0;
+
+    /*
+     * Guarantee the right id generation
+     */
+    private int idinit = 0;
+
+    /*
+     *  Used for view generation
+     *  If I change view quickly, I have to remember the last view I wanted to install(even if not yet install)
+     */
+    private View view_buffer;
 
     /*
      * HashMap Used for detect the crashes
      */
     private HashMap<ActorRef, Boolean> fromWhomTheMessagesArrived;
+
 
     /*
      * Actor Constructor
@@ -35,6 +51,7 @@ public class NodeCoordinator extends Node {
 
         List<ActorRef> group = new ArrayList<>();
         group.add(getSelf());
+
         List<String> viewAsString = new ArrayList<>(0);
         viewAsString.add(getSelf().path().name().substring(4));
 
@@ -43,6 +60,8 @@ public class NodeCoordinator extends Node {
         this.fromWhomTheMessagesArrived = new HashMap<>();
 
     }
+
+
     static Props props(int id) {
         return Props.create(NodeCoordinator.class, () -> new NodeCoordinator(id));
     }
@@ -69,7 +88,7 @@ public class NodeCoordinator extends Node {
                 .match(ChatMsg.class,         this::onChatMsg)         //#3
                 .match(PrintHistoryMsg.class, this::printHistory)      //#4
                 .match(JoinRequest.class,    this::onJoinRequest)      //#6
-                .match(Unstable.class,    this::onUnstable)      //#9
+                .match(Flush.class, this::onFlush)
                 .build();
     }
 
@@ -84,19 +103,15 @@ public class NodeCoordinator extends Node {
     /*
      * Crash detection every 15 sec
      */
-
-
     @Override
     public void preStart() {
+
         getContext().system().scheduler().schedule(
                 Duration.create(10, TimeUnit.SECONDS),
                 Duration.create(15, TimeUnit.SECONDS),
                 () -> crashDetector(),
                 getContext().system().dispatcher());
-
     }
-
-
 
 
     /*
@@ -109,14 +124,31 @@ public class NodeCoordinator extends Node {
      */
     public void onChatMsg(ChatMsg msg) {
 
-        ChatMsg drop;
-        if (lastMessages.get(getSender()) != null) {
-            drop = lastMessages.get(getSender());
-            deliver(drop);
-        }
-        lastMessages.put(getSender(), msg);
         this.fromWhomTheMessagesArrived.replace(getSender(), true);
 
+        if(!msg.isACopy && msg.viewNumber == this.view.viewCounter){
+            System.out.println("\u001B[33m" + getSelf().path().name() + ": " + msg.text +" arrived from " + getSender().path().name() + " for the view " + this.view.viewCounter); //add list of node inside view
+            // normal message
+            if (lastMessages.get(getSender()) != null) {
+                deliver(lastMessages.get(getSender()));
+            }
+            lastMessages.put(getSender(), msg);
+        }
+        else{
+            //is a copy
+            if(msg.viewNumber == this.view.viewCounter){
+                //we are in the same view
+                if(msg.sequenceNumber > this.lastMessages.get(getSender()).sequenceNumber){
+                    //we use the sequence number to check if the message is a duplicate
+                    deliver(msg);
+                }
+            }
+            else if(msg.viewNumber > this.view.viewCounter){
+                //save in the buffer
+                messagesBuffer.add(msg);
+            }
+            //else if(msg.viewNumber < this.view.getViewCounter()) -> message is a duplicate, ignore it
+        }
     }
 
 
@@ -126,25 +158,25 @@ public class NodeCoordinator extends Node {
      */
     public void onJoinRequest(JoinRequest jr) {
 
-
         System.out.println("\u001B[34m" + getSender().path().name() + " asking for joining");
-        /*
-         * Send the new id to the new node
-         */
-        int id = view.getGroup().size() == 0 ? 0 : view.getGroup().size();
-        getSender().tell(new NewId(id), getSelf());
 
+        if(this.view_buffer == null) this.view_buffer = new View(this.view.group, this.view.viewAsString, this.view.viewCounter);
+        getSender().tell(new initNode(++this.idinit, this.view_buffer), getSelf());
 
+        getSender().tell(new StartChatMsg(), getSelf());
+
+        View newView = this.getNewView(getSender());
+
+        multicast(newView, newView);
+
+        multicast(new Flush(newView), newView);
 
     }
 
 
+   private void crashDetector(){
 
-
-
-    private void crashDetector(){
-
-        if(this.noMulticastStatus) return;
+        if(inhibit_sends != 0) return;
 
         /*
          * If I find some false values, means that no messages arrived from that peers
@@ -160,10 +192,7 @@ public class NodeCoordinator extends Node {
          * OMG! INDIGNAZIONE!!!!!
          */
         if(!crashedPeers.isEmpty()){
-
             System.out.println("OMG!!! Someone is crashed! ___look who's crashed->" + this.fromWhomTheMessagesArrived.toString());
-
-
         }
 
 
@@ -179,5 +208,27 @@ public class NodeCoordinator extends Node {
 
 
 
+    /*
+     * Method to create a new view
+     */
+    public View getNewView(ActorRef newPeer){
+
+        if(this.view_buffer == null){
+            this.view_buffer = new View(this.view.group, this.view.viewAsString, this.view.viewCounter);
+        }
+
+        List<ActorRef> actors = new ArrayList<>(this.view_buffer.group);
+        actors.add(newPeer);
+
+        List<String> names = new ArrayList<>(this.view_buffer.viewAsString);
+        names.add(newPeer.path().name().substring(4));
+
+        int i = this.view_buffer.viewCounter+1;
+        View v = new View(actors, names, i);
+
+        this.view_buffer = v;
+
+        return v;
+    }
 
 }

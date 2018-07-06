@@ -11,7 +11,7 @@ import java.util.List;
 public class App {
 
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
 
         // Create the 'helloakka' actor system
         final ActorSystem system = ActorSystem.create("helloakka");
@@ -30,7 +30,6 @@ public class App {
                 NodeParticipant.props(),
                 "Node1");
         group.add(node1);
-
         ActorRef node2 = system.actorOf(
                 NodeParticipant.props(),
                 "Node2");

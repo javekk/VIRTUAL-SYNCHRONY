@@ -51,11 +51,10 @@ public class NodeParticipant extends Node {
                 .match(StartChatMsg.class, this::onStartChatMsg)    //#2
                 .match(ChatMsg.class, this::onChatMsg)         //#3
                 .match(PrintHistoryMsg.class, this::printHistory)      //#4
-                .match(NewViewMessage.class, this::onGetNewViewMessage)            //#5
-                .match(CanJoin.class, this::join)                    //#6
-                .match(NewId.class, this::onNewId)      //#8
+                .match(View.class, this::onGetNewViewMessage)            //#5
+                .match(initNode.class, this::onInit)      //#8
+                .match(Flush.class, this::onFlush)
                 .match(Crash.class,    this::onCrash)      //#p1
-                .match(Unstable.class,    this::onUnstable)      //#9
                 .build();
     }
 
@@ -79,6 +78,7 @@ public class NodeParticipant extends Node {
     //          / ___ \  | (__  | |_  | (_) | | |      |_____|   | |_) | |  __/ | | | | | (_| |  \ V /
     //         /_/   \_\  \___|  \__|  \___/  |_|                |____/   \___| |_| |_|  \__,_|   \_/
 
+
     /*
      * #3
      * When we received a Message
@@ -90,39 +90,50 @@ public class NodeParticipant extends Node {
 
         if(crashed) return;
 
-
-        ChatMsg drop;
-        if (lastMessages.get(getSender()) != null) {
-            drop = lastMessages.get(getSender());
-            deliver(drop);
+        if(!msg.isACopy && msg.viewNumber == this.view.viewCounter){
+            // normal message
+            System.out.println("\u001B[33m" + getSelf().path().name() + ": " + msg.text +" arrived from " + getSender().path().name() + " for the view " + this.view.viewCounter); //add list of node inside view
+            if (lastMessages.get(getSender()) != null) {
+                deliver(lastMessages.get(getSender()));
+            }
+            lastMessages.put(getSender(), msg);
+        }
+        else{
+            //is a copy
+            if(msg.viewNumber == this.view.viewCounter){
+                //we are in the same view
+                if(msg.sequenceNumber > this.lastMessages.get(getSender()).sequenceNumber){
+                    //we use the sequence number to check if the message is a duplicate
+                    deliver(msg);
+                }
+            }
+            else if(msg.viewNumber > this.view.viewCounter){
+                //save in the buffer
+                messagesBuffer.add(msg);
+            }
+            //else if(msg.viewNumber < this.view.getViewCounter()) -> message is a duplicate, ignore it
 
         }
-        lastMessages.put(getSender(), msg);
     }
 
 
     /*
-     * #5
-     * When I receive a new view,
-     * I am unstable
-     * Multicast Unstable
-     * Multicast Flush, with my last messages for the crashed nodes
+     * I get a new view
      */
-    public void onGetNewViewMessage(NewViewMessage newViewMessage) {
+    public void onGetNewViewMessage(View view) {
 
+        this.inhibit_sends++;
 
-    }
+        /*
+         * Multicast (and deliver) all the unstable message
+         */
+        multicastAllUnstableMessages(view);
 
+        /*
+         * Flush the view
+         */
+        multicast(new Flush(view), view);
 
-    /*
-     * #6
-     * Let's join the group and start multicasting
-     */
-    public void join(CanJoin cj) {
-        this.view = cj.newViewMessage.view;
-        this.getSelf().tell(new JoinGroupMsg(), null);
-        this.getSelf().tell(new StartChatMsg(), getSelf());
-        this.crashed = false;
     }
 
 
@@ -130,8 +141,9 @@ public class NodeParticipant extends Node {
      * #8
      * I have a new ID, yea
      */
-    public void onNewId(NewId newId) {
-        this.id = newId.newId;
+    public void onInit(initNode initNode) {
+        this.id = initNode.newId;
+        this.view = initNode.initialView; //in the init part I use the previuos view in practise it is needed only for the counter
     }
 
 
@@ -140,16 +152,16 @@ public class NodeParticipant extends Node {
      * #p1
      * emulate a crash and a recovery in a given time
      */
-    public void onCrash(Crash c) throws InterruptedException {
+    public void onCrash(Crash c) {
         this.crashed = true;
-        System.out.println("CRASH!!!!!!!" + getSelf().path().name());
+        System.out.println("+++" + getSelf().path().name() + " just crashed+++");
 
         /*
          * I try to rejoin after a while
          */
         getContext().system().scheduler().scheduleOnce(
                 Duration.create(c.delay, TimeUnit.SECONDS),
-                this.view.getGroup().get(0),
+                this.view.group.get(0),
                 new JoinRequest(), // the message to send
                 getContext().system().dispatcher(), getSelf()
         );
@@ -163,8 +175,6 @@ public class NodeParticipant extends Node {
     //        |  _  | |  __/ | | | |_) | | | | | | | | (_| |   |  _|   | |_| | | | | | | (__  \__ \
     //        |_| |_|  \___| |_| | .__/  |_| |_| |_|  \__, |   |_|      \__,_| |_| |_|  \___| |___/
     //                           |_|                  |___/
-
-
 
 
 }
