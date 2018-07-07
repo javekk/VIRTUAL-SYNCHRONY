@@ -421,18 +421,19 @@ class Node extends AbstractActor {
          for (Map.Entry<ActorRef, ChatMsg> entry : this.lastMessages.entrySet()){
              ChatMsg unstableMsg = entry.getValue();
 
-             if(unstableMsg != null && unstableMsg.viewNumber < view.viewCounter){
+             if(unstableMsg != null && !unstableMsg.isACopy && unstableMsg.viewNumber < view.viewCounter){
 
                  System.out.println("     \u001B[31m" + getSelf().path().name() +" -> unstable message in multicast; sender:" + unstableMsg.actorRef.path().name() + "; text: " + unstableMsg.text + "; view: " + unstableMsg.viewNumber);
-                 multicast(new ChatMsg(unstableMsg.actorRef,
-                                       unstableMsg.text,
-                                       unstableMsg.viewNumber, // we send the unstable message in the new view
-                                       unstableMsg.sequenceNumber,
-                                     true), //is a copy?
-                            view);
+                 ChatMsg m = new ChatMsg(unstableMsg.actorRef,
+                         unstableMsg.text,
+                         unstableMsg.viewNumber, // we send the unstable message in the new view
+                         unstableMsg.sequenceNumber,
+                         true);//is a copy?
+                 multicast(m,view);
 
                  /*Now the message is stable, so I can deliver it*/
                  deliver(unstableMsg);
+                 this.lastMessages.put(m.actorRef, m);
              }
          }
      }
