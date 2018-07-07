@@ -100,6 +100,7 @@ public class NodeParticipant extends Node {
      * I have a new ID, yea
      */
     private void onInit(initNode initNode) {
+        this.crashed = false;
         this.id = initNode.newId;
         this.view = initNode.initialView; //in the init part
 
