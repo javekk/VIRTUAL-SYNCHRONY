@@ -82,6 +82,11 @@ public class NodeParticipant extends Node {
 
         this.inhibit_sends++;
 
+        if(this.id == 2 && view.viewCounter == 3){
+            getSelf().tell(new NodeParticipant.Crash(60), null);
+            return;
+        }
+
         //Multicast (and deliver) all the unstable message
         multicastAllUnstableMessages(view);
 

@@ -30,13 +30,13 @@ class Node extends AbstractActor {
      /*
       * Current View
       */
-    public View view;
+     View view;
 
 
      /*
       * Random Number used to random multicast
       */
-    public Random rnd = new Random();
+     private Random rnd = new Random();
 
 
 
@@ -49,50 +49,50 @@ class Node extends AbstractActor {
     /*
      *    ID of the current actor
      */
-    public int id = 0;
+    int id = 0;
 
 
     /*
      *   The local hashMap, in which we keep the last with the ActorRef and its own LastMessage
      *   (used as Buffer)
      */
-    public HashMap<ActorRef,ChatMsg> lastMessages = new HashMap<>();
+    private HashMap<ActorRef,ChatMsg> lastMessages = new HashMap<>();
 
 
     /*
      * The chat history
      */
-    public StringBuffer chatHistory = new StringBuffer();
+    private StringBuffer chatHistory = new StringBuffer();
 
 
     /*
      * Am I crashed?
      */
-    public  boolean crashed = false;
+    boolean crashed = false;
 
 
     /*
      * Am I Unstable?
      */
-    public  int inhibit_sends = 0;
+    int inhibit_sends = 0;
 
 
     /*
      * Buffer in which we put the messages to deliver in views not yet installed
      */
-    public List<ChatMsg> messagesBuffer = new ArrayList<>();
+    private List<ChatMsg> messagesBuffer = new ArrayList<>();
 
 
     /*
      * List of received flush messages
      */
-    public List<Flush> flushBuffer = new ArrayList<>();
+    private List<Flush> flushBuffer = new ArrayList<>();
 
 
      /*
       * init param
       */
-     boolean hasInstalledTheFirstView = false;
+     private boolean hasInstalledTheFirstView = false;
 
     //         __  __                   _____                                             ____   _
     //        |  \/  |  ___    __ _    |_   _|  _   _   _ __     ___   ___               / ___| | |   __ _   ___   ___    ___   ___
@@ -118,29 +118,29 @@ class Node extends AbstractActor {
      * #1
      * Start message that informs every chat participant about its peers
      */
-    public static class JoinGroupMsg implements Serializable {}
+    static class JoinGroupMsg implements Serializable {}
 
 
     /*
      * #2
      * A message requesting the peer to start to discus
      */
-    public static class StartChatMsg implements Serializable {}
+    static class StartChatMsg implements Serializable {}
 
 
     /*
      * #3
      * Chat message, a normal message
      */
-    public static class ChatMsg implements Serializable {
+    static class ChatMsg implements Serializable {
 
-        public final ActorRef actorRef;   // the actorRef
-        public final String text;          // text of the messagges
-        public final int viewNumber;       // view in which the message belongs
-        public final int sequenceNumber;   // sequence number of the message
-        public final boolean isACopy;      // to say if we're dealing with unstable messages
+        final ActorRef actorRef;   // the actorRef
+        final String text;          // text of the messagges
+        final int viewNumber;       // view in which the message belongs
+        final int sequenceNumber;   // sequence number of the message
+        final boolean isACopy;      // to say if we're dealing with unstable messages
 
-        public ChatMsg(ActorRef actorRef, String text, int viewNumber, int sequenceNumber, boolean isACopy) {
+        ChatMsg(ActorRef actorRef, String text, int viewNumber, int sequenceNumber, boolean isACopy) {
             this.actorRef = actorRef;
             this.text = text;
             this.viewNumber = viewNumber;
@@ -154,14 +154,14 @@ class Node extends AbstractActor {
      * #4
      * A message requesting to print the chat history
      */
-    public static class PrintHistoryMsg implements Serializable {}
+    static class PrintHistoryMsg implements Serializable {}
 
 
     /*
      * #5
      * I have to ask to the Coordinator if I can join
      */
-    public static class JoinRequest implements Serializable {}
+    static class JoinRequest implements Serializable {}
 
 
     /*
@@ -170,11 +170,11 @@ class Node extends AbstractActor {
      * Same class for both cohort and coordinator, but different in the action implementation
      * fot this reason this Class is map in the subclasses
      */
-    public static class View implements Serializable{
-        public final List<ActorRef> group;
-        public final List<String> viewAsString;
-        public final int viewCounter;
-        public View(List<ActorRef> group, List<String> viewAsString, int viewCounter) {
+    static class View implements Serializable{
+        final List<ActorRef> group;
+        final List<String> viewAsString;
+        final int viewCounter;
+        View(List<ActorRef> group, List<String> viewAsString, int viewCounter) {
             this.group = group;
             this.viewAsString = viewAsString;
             this.viewCounter = viewCounter;
@@ -186,10 +186,10 @@ class Node extends AbstractActor {
      * #8
      * new Id for the new Node joined
      */
-    public static class initNode implements Serializable{
-        public final int newId;
-        public final View initialView;
-        public initNode(int newId, View initialView ) {
+    static class initNode implements Serializable{
+        final int newId;
+        final View initialView;
+        initNode(int newId, View initialView ) {
             this.newId = newId;
             this.initialView = initialView;
         }
@@ -199,9 +199,9 @@ class Node extends AbstractActor {
     /*
      * Flush Message
      */
-    public static class Flush implements Serializable{
-        public final View view;
-        public Flush(View view){
+    static class Flush implements Serializable{
+        final View view;
+        Flush(View view){
             this.view = view;
         }
     }
@@ -210,7 +210,7 @@ class Node extends AbstractActor {
     /*
      * HeartBeat
      */
-    public  static class HeartBeat implements Serializable{};
+    static class HeartBeat implements Serializable{}
 
      //             _             _                                ____           _
      //            / \      ___  | |_    ___    _ __              | __ )    ___  | |__     __ _  __   __
@@ -224,7 +224,7 @@ class Node extends AbstractActor {
      * When a node enters in the group, it first of all get all the peers(init the group variable)
      * Then print the the fact that it joined
      */
-    public void onJoinGroupMsg(JoinGroupMsg msg) {
+    void onJoinGroupMsg(JoinGroupMsg msg) {
         System.out.println("\u001B[36m " + getSelf().path().name() +": joining a group of " + this.view.group.size() + "peers with ID " + this.id);
     }
 
@@ -234,13 +234,13 @@ class Node extends AbstractActor {
      * The first Time I want to send a message a pass through this method then,
      * look at sendChatMsg Method
      */
-    public void onStartChatMsg(StartChatMsg msg) {
+    void onStartChatMsg(StartChatMsg msg) {
 
         //start messagging
         getContext().system().scheduler().schedule(
                 Duration.create((int)(5000*Math.random()), TimeUnit.MILLISECONDS),
                 Duration.create((int)(5000*Math.random())+1000, TimeUnit.MILLISECONDS),
-                () -> sendChatMsg(),
+                this::sendChatMsg,
                 getContext().system().dispatcher());
 
     }
@@ -253,7 +253,7 @@ class Node extends AbstractActor {
       * I replace the last message with the new one
       * I deliver/drop the Old Message
       */
-     public void onChatMsg(ChatMsg msg) {
+     void onChatMsg(ChatMsg msg) {
 
          if(this instanceof NodeParticipant && !hasInstalledTheFirstView) return;
 
@@ -293,7 +293,7 @@ class Node extends AbstractActor {
      * #4
      * Print the History of this node
      */
-    public void printHistory(PrintHistoryMsg msg) {
+    void printHistory(PrintHistoryMsg msg) {
         System.out.printf("%02d: %s\n", this.id, this.chatHistory);
     }
 
@@ -301,7 +301,9 @@ class Node extends AbstractActor {
      /*
       * onFLusho
       */
-     public void onFlush(Flush flush){
+     void onFlush(Flush flush){
+
+        if(crashed) return;
 
         this.flushBuffer.add(flush);
 
@@ -343,7 +345,7 @@ class Node extends AbstractActor {
      * Multicast of the message
      * appentToHistory
      */
-    public void sendChatMsg() {
+    private void sendChatMsg() {
 
         if (crashed || (inhibit_sends > 0) || view == null) return;
 
@@ -379,7 +381,7 @@ class Node extends AbstractActor {
     /*
      * We model random network delays with this code
      */
-    public void multicast(Serializable m, View view) { // our multicast implementation
+    void multicast(Serializable m, View view) { // our multicast implementation
         List<ActorRef> shuffledGroup = new ArrayList<>(view.group);
         Collections.shuffle(shuffledGroup);
         for (ActorRef p: shuffledGroup) {
@@ -395,7 +397,7 @@ class Node extends AbstractActor {
     /*
      * Deliver the message
      */
-    public void deliver(ChatMsg m) {
+    void deliver(ChatMsg m) {
         if(m != null && m.viewNumber == this.view.viewCounter) {
             appendToHistory(m);
             System.out.println("\u001B[35m"+ getSelf().path().name() + "-> DELIVER " + m.text + "; sender:" + m.actorRef.path().name() + "; view:" + m.viewNumber);
@@ -406,7 +408,7 @@ class Node extends AbstractActor {
     /*
      * Append to the History
      */
-    public void appendToHistory(ChatMsg m) {
+    private void appendToHistory(ChatMsg m) {
             this.chatHistory.append("[" + m.actorRef.path().name() + "," + m.text + "]");
     }
 
@@ -414,7 +416,7 @@ class Node extends AbstractActor {
      /*
       *
       */
-     public void multicastAllUnstableMessages(View view){
+     void multicastAllUnstableMessages(View view){
 
          for (Map.Entry<ActorRef, ChatMsg> entry : this.lastMessages.entrySet()){
              ChatMsg unstableMsg = entry.getValue();
@@ -448,7 +450,7 @@ class Node extends AbstractActor {
      /*
       * Transform a Number to A String
       */
-     public String numberToString(int number){
+     private String numberToString(int number){
          String ret = "";
          String digits = Integer.toString(number);
          for(int i = 0; i < digits.length(); i++){
@@ -458,7 +460,7 @@ class Node extends AbstractActor {
          return ret;
      }
 
-     public String getCharForNumber(int i) {
+     private String getCharForNumber(int i) {
          return i > 0 && i < 27 ? String.valueOf((char)(i + 64)) : null;
      }
 

@@ -21,11 +21,6 @@ public class NodeCoordinator extends Node {
     //
 
     /*
-     * Guarantee the increase of the view counter
-     */
-    private int viewinit = 0;
-
-    /*
      * Guarantee the right id generation
      */
     private int idinit = 0;
@@ -110,7 +105,7 @@ public class NodeCoordinator extends Node {
         getContext().system().scheduler().schedule(
                 Duration.create(5, TimeUnit.SECONDS),
                 Duration.create(10, TimeUnit.SECONDS),
-                () -> crashDetector(),
+                this::crashDetector,
                 getContext().system().dispatcher());
     }
 
@@ -134,18 +129,21 @@ public class NodeCoordinator extends Node {
 
         this.fromWhomTheMessagesArrived.put(getSender(), true);
 
+        this.inhibit_sends++;
+
         View newView = this.getNewView(getSender());
 
         multicastAllUnstableMessages(newView);
 
         System.out.println("  \u001B[31m" + getSelf().path().name() +" -> multicast view" + newView.viewCounter + ":" + newView.viewAsString.toString());
+
         multicast(newView, newView);
         multicast(new Flush(newView), newView);
 
     }
 
 
-    public void onHeartBeat(HeartBeat hb){
+    private void onHeartBeat(HeartBeat hb){
         this.fromWhomTheMessagesArrived.put(getSender(), true);
     }
 
@@ -166,13 +164,15 @@ public class NodeCoordinator extends Node {
 
         if (!crashedPeers.isEmpty()) {
             //OMG! INDIGNAZIONE!!!!!
+            this.inhibit_sends++;
+
             System.out.println("OMG!!! Someone is crashed! ___look who's crashed->" + crashedPeers.toString());
             //create and send the new view
             View newView = this.getTheNewViewFromCrashed(crashedPeers);
-            multicastAllUnstableMessages(newView);
 
             System.out.println("  \u001B[31m" + getSelf().path().name() +" -> multicast view" + newView.viewCounter + ":" + newView.viewAsString.toString());
             multicast(newView, newView);
+            multicastAllUnstableMessages(newView);
             multicast(new Flush(newView), newView);
         }
 
@@ -189,7 +189,7 @@ public class NodeCoordinator extends Node {
      * Methods to create a new view
      */
 
-    public View getNewView(ActorRef newPeer) {
+    private View getNewView(ActorRef newPeer) {
 
         if (this.view_buffer == null) {
             this.view_buffer = new View(this.view.group, this.view.viewAsString, this.view.viewCounter);
@@ -209,7 +209,7 @@ public class NodeCoordinator extends Node {
         return v;
     }
 
-    public View getTheNewViewFromCrashed(List<ActorRef> crashedNodes){
+    private View getTheNewViewFromCrashed(List<ActorRef> crashedNodes){
 
         if (this.view_buffer == null) {
             this.view_buffer = new View(this.view.group, this.view.viewAsString, this.view.viewCounter);
