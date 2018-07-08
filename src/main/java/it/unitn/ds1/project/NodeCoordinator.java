@@ -107,7 +107,7 @@ public class NodeCoordinator extends Node {
         }
 
         //init the node with the initial info
-        getSender().tell(new initNode(++this.idinit, this.view_buffer), getSelf());
+        getSender().tell(new initNode(Integer.parseInt(getSender().path().name().substring(4)), this.view_buffer), getSelf());
 
         //tell it to start messaging, it will start after install the right view
         getSender().tell(new StartChatMsg(), getSelf());

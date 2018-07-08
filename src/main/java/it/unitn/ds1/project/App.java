@@ -10,6 +10,8 @@ import java.util.logging.*;
  * @author Raffaele Perini
  * @author Giovanni Rafael Vuolo
  *
+ * NB: name nodes as NodeID, with ID = integer
+ *
  * Nodes join/crash flow:
  * - Node0 is the coordinator
  * - Node1 and Node2 join
