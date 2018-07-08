@@ -3,7 +3,6 @@ package it.unitn.ds1.project;
 
 import akka.actor.ActorRef;
 import akka.actor.AbstractActor;
-import scala.Function;
 import scala.concurrent.duration.Duration;
 
 import java.util.*;
@@ -329,6 +328,9 @@ class Node extends AbstractActor {
             this.view = currentFlushesForTheNextView.get(0).view; //install the new view i+1
             this.flushBuffer.removeAll(currentFlushesForTheNextView);
             System.out.println("\u001B[33m" + getSelf().path().name() + "-> INSTALL View" + this.view.viewCounter + ": " + this.view.viewAsString.toString()); //add list of node inside view
+            String s = "0";
+            for(String g : this.view.viewAsString){if(!g.equals("0"))s = s.concat(","+g);}
+            App.logger.info(getSelf().path().name().substring(4) + " install view " + this.view.viewCounter +  " " + s);
             deliverBuffered();
             this.inhibit_sends--;
             this.hasInstalledTheFirstView = true;
@@ -357,6 +359,8 @@ class Node extends AbstractActor {
         if (crashed || (inhibit_sends > 0) || view == null) return;
 
         this.sendCount++;
+
+        App.logger.info(getSelf().path().name().substring(4) + " send multicast " + this.sendCount + " within " + this.view.viewCounter);
 
         if(this.id == 3){
             System.out.println(" \u001B[31m" + getSelf().path().name() + " -> message in multicast -> text: " + "LOST_MESSAGE" + "; view: " + this.view.viewCounter);
@@ -408,6 +412,7 @@ class Node extends AbstractActor {
         if(m != null && m.viewNumber == this.view.viewCounter) {
             appendToHistory(m);
             System.out.println("\u001B[35m"+ getSelf().path().name() + "-> DELIVER " + m.text + "; sender:" + m.actorRef.path().name() + "; view:" + m.viewNumber);
+            App.logger.info(getSelf().path().name().substring(4) + " deliver multicast " + m.sequenceNumber + " from " + m.actorRef.path().name().substring(4) + " within " + m.viewNumber);
         }
     }
 

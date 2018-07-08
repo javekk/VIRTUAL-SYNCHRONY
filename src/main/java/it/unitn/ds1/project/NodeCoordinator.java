@@ -137,6 +137,7 @@ public class NodeCoordinator extends Node {
 
         System.out.println("  \u001B[31m" + getSelf().path().name() +" -> multicast view" + newView.viewCounter + ":" + newView.viewAsString.toString());
 
+
         multicast(newView, newView);
         multicast(new Flush(newView), newView);
 
