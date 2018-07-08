@@ -44,7 +44,7 @@ The project is implemented in Akka with the group members being Akka actors that
  - <ID> deliver multicast <seqnum> from <ID> within <view seqnum>  
 ```
 
-##Flush implementation
+## Flush implementation
 
 Here logic of the flush protocol implemented, notice that it is possible to receive view i+k, before i+1 is installed
 
