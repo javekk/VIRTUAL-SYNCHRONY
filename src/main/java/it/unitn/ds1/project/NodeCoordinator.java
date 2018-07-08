@@ -20,42 +20,27 @@ public class NodeCoordinator extends Node {
     //        |_| \_|  \___/   \__,_|  \___|   |_|     |_|     \___/  | .__/  |___/
     //
 
-    /*
-     * Guarantee the right id generation
-     */
+    //Guarantee the right id generation
     private int idinit = 0;
 
-    /*
-     *  Used for view generation
-     *  If I change view quickly, I have to remember the last view I wanted to install(even if not yet install)
-     */
+    //Used in the view generation:
+    //If views change quickly, I have to remember the last view coordinator wanted to install
     private View view_buffer;
 
-    /*
-     * HashMap Used for detect the crashes
-     */
-    private HashMap<ActorRef, Boolean> fromWhomTheMessagesArrived;
+    //Buffer used for detect the crashes
+    private HashMap<ActorRef, Boolean> fromWhomTheMessagesArrived  = new HashMap<>();
 
-
-    /*
-     * Actor Constructor
-     */
+    //Actor Constructor
     NodeCoordinator(int id) {
-
         this.id = id;
 
+        //init the view
         List<ActorRef> group = new ArrayList<>();
         group.add(getSelf());
-
         List<String> viewAsString = new ArrayList<>(0);
         viewAsString.add(getSelf().path().name().substring(4));
-
         this.view = new View(group, viewAsString, 0);
-
-        this.fromWhomTheMessagesArrived = new HashMap<>();
-
     }
-
 
     static Props props(int id) {
         return Props.create(NodeCoordinator.class, () -> new NodeCoordinator(id));
@@ -78,13 +63,12 @@ public class NodeCoordinator extends Node {
     @Override
     public Receive createReceive() {
         return receiveBuilder()
-                .match(JoinGroupMsg.class, this::onJoinGroupMsg)    //#1
-                .match(StartChatMsg.class, this::onStartChatMsg)    //#2
-                .match(ChatMsg.class, this::onChatMsg)         //#3
-                .match(PrintHistoryMsg.class, this::printHistory)      //#4
-                .match(JoinRequest.class, this::onJoinRequest)      //#6
-                .match(Flush.class, this::onFlush)
-                .match(HeartBeat.class, this::onHeartBeat)
+                .match(StartChatMsg.class, this::onStartChatMsg)    //#1
+                .match(ChatMsg.class, this::onChatMsg)              //#2
+                .match(PrintHistoryMsg.class, this::printHistory)   //#3
+                .match(JoinRequest.class, this::onJoinRequest)      //#4
+                .match(Flush.class, this::onFlush)                  //#7
+                .match(HeartBeat.class, this::onHeartBeat)          //#8
                 .build();
     }
 
@@ -97,7 +81,7 @@ public class NodeCoordinator extends Node {
 
 
     /*
-     * Crash detection every 15 sec
+     * Crash detection every 10 sec
      */
     @Override
     public void preStart() {
@@ -110,10 +94,9 @@ public class NodeCoordinator extends Node {
     }
 
 
-
     /*
-     * #5
-     * Coordinator has a different behavior for the same class
+     * #4
+     * What the coordinator does when a node asks to join
      */
     public void onJoinRequest(JoinRequest jr) {
 
@@ -123,32 +106,51 @@ public class NodeCoordinator extends Node {
             this.view_buffer = new View(this.view.group, this.view.viewAsString, this.view.viewCounter);
         }
 
+        //init the node with the initial info
         getSender().tell(new initNode(++this.idinit, this.view_buffer), getSelf());
 
+        //tell it to start messaging, it will start after install the right view
         getSender().tell(new StartChatMsg(), getSelf());
 
+        //since it just ask for joining, mark it as not-crashed
         this.fromWhomTheMessagesArrived.put(getSender(), true);
 
         this.inhibit_sends++;
 
+        //create new view with the new node
         View newView = this.getNewView(getSender());
 
+        //the name is pretty self-explained
         multicastAllUnstableMessages(newView);
 
         System.out.println("  \u001B[31m" + getSelf().path().name() +" -> multicast view" + newView.viewCounter + ":" + newView.viewAsString.toString());
 
-
+        //multicast new view with the flush
         multicast(newView, newView);
         multicast(new Flush(newView), newView);
-
     }
 
 
+    /*
+     * #8
+     * When the coordinator receives an heartbeat, marks the sender as alive
+     */
     private void onHeartBeat(HeartBeat hb){
         this.fromWhomTheMessagesArrived.put(getSender(), true);
     }
 
 
+    //         _   _          _           _                     _____
+    //        | | | |   ___  | |  _ __   (_)  _ __     __ _    |  ___|  _   _   _ __     ___   ___
+    //        | |_| |  / _ \ | | | '_ \  | | | '_ \   / _` |   | |_    | | | | | '_ \   / __| / __|
+    //        |  _  | |  __/ | | | |_) | | | | | | | | (_| |   |  _|   | |_| | | | | | | (__  \__ \
+    //        |_| |_|  \___| |_| | .__/  |_| |_| |_|  \__, |   |_|      \__,_| |_| |_|  \___| |___/
+    //                           |_|                  |___/
+
+
+    /*
+     * Check for crashed nodes
+     */
     private void crashDetector() {
 
         //If I find some false values, means that no messages arrived from that peers
@@ -159,20 +161,26 @@ public class NodeCoordinator extends Node {
             boolean value = entry.getValue();
             if (!value){
                 crashedPeers.add(key);
-                this.fromWhomTheMessagesArrived.remove(key);
+                this.fromWhomTheMessagesArrived.remove(key); //it crashed, so I do not have to wait for the heartbeat
             }
         }
 
         if (!crashedPeers.isEmpty()) {
-            //OMG! INDIGNAZIONE!!!!!
+            //someone is crashed
+
             this.inhibit_sends++;
 
             System.out.println("OMG!!! Someone is crashed! ___look who's crashed->" + crashedPeers.toString());
+
             //create and send the new view
             View newView = this.getTheNewViewFromCrashed(crashedPeers);
 
             System.out.println("  \u001B[31m" + getSelf().path().name() +" -> multicast view" + newView.viewCounter + ":" + newView.viewAsString.toString());
+
+            //create new view with the new node
             multicast(newView, newView);
+
+            //multicast new view with the flush
             multicastAllUnstableMessages(newView);
             multicast(new Flush(newView), newView);
         }
@@ -187,9 +195,8 @@ public class NodeCoordinator extends Node {
 
 
     /*
-     * Methods to create a new view
+     * Method to create a new view, adding a new peer
      */
-
     private View getNewView(ActorRef newPeer) {
 
         if (this.view_buffer == null) {
@@ -210,6 +217,9 @@ public class NodeCoordinator extends Node {
         return v;
     }
 
+    /*
+     * Method to create a new view, removing the crashed nodes
+     */
     private View getTheNewViewFromCrashed(List<ActorRef> crashedNodes){
 
         if (this.view_buffer == null) {

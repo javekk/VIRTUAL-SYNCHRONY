@@ -2,30 +2,34 @@ package it.unitn.ds1.project;
 
 import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
-import com.typesafe.config.Config;
-import com.typesafe.config.ConfigFactory;
 
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.text.SimpleDateFormat;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
 import java.util.logging.*;
 
+/*
+ * @author Raffaele Perini
+ * @author Giovanni Rafael Vuolo
+ *
+ * Nodes join/crash flow:
+ * - Node0 is the coordinator
+ * - Node1 and Node2 join
+ * - Node3 joins after 10 seconds
+ * - Node2 crashes when receives the view 3 (# crash after receiving view change)
+ * - Node4 join while the system is waiting for node2
+ * - Node3 crashes while is multicasting (# crash during sending multicast)
+ * - Node4 crashes after 10 seconds (# crash after receiving multicast)
+ * - Node4 recover after 25 seconds
+ * - (node3 recovers and crashes every 600 sec)
+ */
 public class App {
 
     public static Logger logger = Logger.getLogger(App.class.getName());
 
     public static void main(String[] args) {
 
-        FileHandler fh;
+        //Prepare the log
         try {
-
-
+            FileHandler fh;
             Handler handlerObj = new ConsoleHandler();
             handlerObj.setLevel(Level.ALL);
             logger.setLevel(Level.ALL);
@@ -45,8 +49,6 @@ public class App {
             e.printStackTrace();
         }
 
-
-
         // Create the 'helloakka' actor system
         final ActorSystem system = ActorSystem.create("helloakka");
 
@@ -62,38 +64,35 @@ public class App {
                 NodeParticipant.props(),
                 "Node2");
 
+        //node1 and node2 ask for join
         coordinator.tell(new Node.JoinRequest(), node1);
         coordinator.tell(new Node.JoinRequest(), node2);
+        //even the coordinator has to start messaging
         coordinator.tell(new Node.StartChatMsg(), coordinator);
 
         try {
 
-            /*
-             * After a while I insert Node3 that
-             * will crash after sending one message
-             */
+            // After a while I insert Node3 that will crash after sending one message
             Thread.sleep(10000);
             ActorRef node3 = system.actorOf(
-                    NodeParticipant.props(), // this one will catch up the topic "a"
+                    NodeParticipant.props(),
                     "Node3");
             coordinator.tell(new Node.JoinRequest(), node3);
 
-            /*
-             * After a while I insert Node4
-             */
+            //After a while I insert Node4 that will crash
             Thread.sleep(10000);
             ActorRef node4 = system.actorOf(
-                    NodeParticipant.props(), // this one will catch up the topic "a"
+                    NodeParticipant.props(),
                     "Node4");
             coordinator.tell(new Node.JoinRequest(), node4);
             Thread.sleep(10000);
-            node4.tell(new NodeParticipant.Crash(20), null); //crash and recover in 60 sec
+            node4.tell(new NodeParticipant.Crash(25), null); //crash and recover in 60 sec
 
             System.in.read();
-
-
         }
-        catch (Exception ioe) {}
+        catch (Exception ioe) {
+        }
+
         system.terminate();
     }
 
