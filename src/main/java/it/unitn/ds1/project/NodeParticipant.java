@@ -80,6 +80,8 @@ public class NodeParticipant extends Node {
      */
     public void onGetNewViewMessage(View view) {
 
+        if(this.crashed) return;
+
         this.inhibit_sends++;
 
         if(this.id == 2 && view.viewCounter == 3){

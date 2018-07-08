@@ -3,6 +3,7 @@ package it.unitn.ds1.project;
 
 import akka.actor.ActorRef;
 import akka.actor.AbstractActor;
+import scala.Function;
 import scala.concurrent.duration.Duration;
 
 import java.util.*;
@@ -311,11 +312,17 @@ class Node extends AbstractActor {
 
         List<Flush> currentFlushesForTheNextView = new ArrayList<>();
 
-        for(Flush f: this.flushBuffer){
-            numberOfFlushNeeded = Math.min(numberOfFlushNeeded, f.view.group.size());
-            if(f.view.viewCounter == this.view.viewCounter+1){
-                currentFlushesForTheNextView.add(f);
-            }
+        ArrayList<ActorRef> tmp = new ArrayList<>(this.flushBuffer.get(0).view.group);
+        for(Flush f : this.flushBuffer){
+            tmp.retainAll(f.view.group);
+        }
+        numberOfFlushNeeded = Math.min(numberOfFlushNeeded, tmp.size());
+
+
+         for(Flush f: this.flushBuffer){
+             if(f.view.viewCounter == this.view.viewCounter+1){
+                 currentFlushesForTheNextView.add(f);
+             }
         }
 
         if(currentFlushesForTheNextView.size() == numberOfFlushNeeded-1){
@@ -448,6 +455,7 @@ class Node extends AbstractActor {
          }
      }
 
+
      /*
       * Transform a Number to A String
       */
@@ -464,7 +472,4 @@ class Node extends AbstractActor {
      private String getCharForNumber(int i) {
          return i > 0 && i < 27 ? String.valueOf((char)(i + 64)) : null;
      }
-
-
-
  }
