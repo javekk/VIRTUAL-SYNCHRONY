@@ -85,7 +85,11 @@ Here logic of the flush protocol implemented, notice that it is possible to rece
 
 ## Execution
 
-In the App class is scheduled the following behaviuor:
+Run the following in the root to start the program:
+```
+    sudo gradle run
+```
+In the *App* class, that correspond to the *Execution_3* class in the Test branch is scheduled the following behaviuor:
 
  *  Node0 is the coordinator.
  *  Node1 and Node2 join (*view1, view2*).
