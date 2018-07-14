@@ -23,9 +23,9 @@ import java.util.logging.*;
  * - Node4 recover after 25 seconds
  * - (node3 recovers and crashes every 600 sec)
  */
-public class App {
+public class Execution_3 {
 
-    public static Logger logger = Logger.getLogger(App.class.getName());
+    public static Logger logger = Logger.getLogger(Execution_3.class.getName());
 
     public static void main(String[] args) {
 

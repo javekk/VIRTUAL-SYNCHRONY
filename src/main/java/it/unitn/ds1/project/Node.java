@@ -287,7 +287,7 @@ class Node extends AbstractActor {
             for (String g : this.view.viewAsString) {
                 if (!g.equals("0")) s = s.concat("," + g);
             }
-            App.logger.info(getSelf().path().name().substring(4) + " install view " + this.view.viewCounter + " " + s);
+            Execution_3.logger.info(getSelf().path().name().substring(4) + " install view " + this.view.viewCounter + " " + s);
 
             //check if there are messages to deliver in the view just install
             deliverBuffered();
@@ -316,7 +316,7 @@ class Node extends AbstractActor {
         //update the sequence number (use as message id)
         this.sendCount++;
 
-        App.logger.info(getSelf().path().name().substring(4) + " send multicast " + this.sendCount + " within " + this.view.viewCounter);
+        Execution_3.logger.info(getSelf().path().name().substring(4) + " send multicast " + this.sendCount + " within " + this.view.viewCounter);
 
         //MODIFICATION
         // The node with id == 3, will deliver a message only to node1 and then crash
@@ -375,7 +375,7 @@ class Node extends AbstractActor {
             //deliver only for the current view
             appendToHistory(m);
             System.out.println("\u001B[35m" + getSelf().path().name() + "-> DELIVER " + m.text + "; sender:" + m.actorRef.path().name() + "; view:" + m.viewNumber);
-            App.logger.info(getSelf().path().name().substring(4) + " deliver multicast " + m.sequenceNumber + " from " + m.actorRef.path().name().substring(4) + " within " + m.viewNumber);
+            Execution_3.logger.info(getSelf().path().name().substring(4) + " deliver multicast " + m.sequenceNumber + " from " + m.actorRef.path().name().substring(4) + " within " + m.viewNumber);
         }
     }
 
