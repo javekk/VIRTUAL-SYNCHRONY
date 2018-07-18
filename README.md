@@ -95,8 +95,8 @@ In the *App* class, that correspond to the *Execution_3* class in the Test branc
  *  Node1 and Node2 join (*view1, view2*).
  *  Node3 joins after 10 seconds (view3).
  *  Node2 crashes when receives the view 3.  (*view4*) [#**crash after receiving view change**] 
- *  Node4 join while the system is waiting for node2 (*view5*)
- *  *view3, view4,view5 installed all together.
+ *  Node4 joins while the system is waiting for node2 (*view5*)
+ *  *view3, view4, view5 installed all together.
  *  Node3 crashes while is multicasting. (*view6*) [#**crash during sending multicast**] 
  *  Node4 crashes after 10 seconds. (*view7*) [#**crash after receiving multicast**]
- *  Node4 recover after 25 seconds. (*view8*).
+ *  Node4 recovers after 25 seconds. (*view8*).
