@@ -6,7 +6,7 @@
 
 In this project, it is implemented a simple peer-to-peer group communication service providing the **virtual synchrony** guarantees.
 
-The project is implemented in Akka with the group members being Akka actors that send multicast messages to each other.  The system allows adding new participants to the group as well as tolerate silent crashes of some existing participants at any time.
+The project is implemented in Akka, with the group members being Akka actors that send multicast messages to each other.  The system allows adding new participants to the group as well as tolerates silent crashes of some existing participants at any time.
 
 ## System Properties
 
@@ -14,12 +14,12 @@ The project is implemented in Akka with the group members being Akka actors that
 * All messages sent in view i are delivered by all operational nodes or by none if sender crashes while multicasting.
 
 #### Coordinator
-* Reliable actor (ID:0), called "group manager" or "coordinator".
+* Reliable actor (ID:0), it cannot crash, called "group manager" or "coordinator".
 * Keeps track of views, **sends views updates** (when new node joins or when a node crashes).
-* Assigns ID to other actors, based on their names
+* Assigns ID to other actors, based on their names.
 
 #### Joining 			
-* Actor joining sends a request to group manager (actor with ID=0)
+* Joining actor sends a request to group manager (actor with ID=0)
 * Receives new View with him included
 * Starts sending multicast
 
@@ -28,8 +28,8 @@ The project is implemented in Akka with the group members being Akka actors that
 * System (receiving actors) detects duplicated messages: deliver **at-most-once**.
 
 #### Stable messages
-* An actor can only send a new multicast message when it has successfully send previuos one to all nodes.
-* If an actor receive a message from P it means that previous messages from P are stables.
+* An actor can only send a new multicast message when it has successfully sent the previous one to all nodes.
+* If an actor receives a message from P it means that previous messages from P are stables.
 
 #### Crash detection
 * All actors send heartbeat to coordinator every 4.5 seconds.
@@ -46,14 +46,14 @@ The project is implemented in Akka with the group members being Akka actors that
 
 ## Flush implementation
 
-Here logic of the flush protocol implemented, notice that it is possible to receive view i+k, before i+1 is installed
+Here is logic of the flush protocol implemented, notice that it is possible to receive view i+k, before i+1 is installed
 
 ##### On receive View i+k
 
 ```
-	inihibit_sends++; // until more than zero, no messages are sent
+	inihibit_sends++; // while more than zero, no messages are sent
 	multicast(all_unstable_messages, view j); // in the view j < i+k
-	delvier(all_unstable_messages);
+	deliver(all_unstable_messages);
 	multicast(flush(view i+k));
 ```
 
@@ -69,7 +69,7 @@ Here logic of the flush protocol implemented, notice that it is possible to rece
 		}
 	} 
 	else if (unstableMsg.viewId > this.viewID){
-		messageBuffer.save(unstableMsg); // it will deliver, when its view will be installed
+		messageBuffer.save(unstableMsg); // it will be delivered, when its view will be installed
 	}
 ```
 
