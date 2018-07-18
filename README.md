@@ -2,7 +2,7 @@
 
 *Authors*:
 - Raffaele Perini
-- Giovani Rafael Vuolo
+- Giovanni Rafael Vuolo
 
 In this project, it is implemented a simple peer-to-peer group communication service providing the **virtual synchrony** guarantees.
 
